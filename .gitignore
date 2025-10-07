@@ -1,0 +1,25 @@
+# 模型權重 (太大,不要上傳)
+weights/
+*.safetensors
+*.pth
+*.bin
+
+# 生成的文件
+outputs/
+temp_uploads/
+temp_downloads/
+*.mp4
+*.wav
+*.jpg
+*.png
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.log
+.ipynb_checkpoints/
+
+# 環境
+infinitetalk-env/
+venv/
