@@ -1,5 +1,5 @@
 """
-InfiniteTalk 模型服務 - 修復長視頻生成
+InfiniteTalk 模型服務 - 支援多品質參數
 """
 import torch
 import os
@@ -21,6 +21,30 @@ from generate_infinitetalk import audio_prepare_single, get_embedding
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+QUALITY_PRESETS = {
+    'fast': {
+        'resolution': '480',
+        'sampling_steps': 4,
+        'motion_frame': 5,
+        'use_teacache': False,
+        'teacache_thresh': 1.0
+    },
+    'balanced': {
+        'resolution': '480',
+        'sampling_steps': 6,
+        'motion_frame': 7,
+        'use_teacache': False,
+        'teacache_thresh': 1.0
+    },
+    'high': {
+        'resolution': '480',
+        'sampling_steps': 8,
+        'motion_frame': 9,
+        'use_teacache': False,
+        'teacache_thresh': 1.0
+    }
+}
+
 class InfiniteTalkModelService:
     def __init__(self, 
                  ckpt_dir='weights/Wan2.1-I2V-14B-480P',
@@ -41,7 +65,6 @@ class InfiniteTalkModelService:
         self.audio_encoder = None
         
     def load_models(self):
-        """載入模型"""
         if self.loaded:
             return
         
@@ -86,7 +109,6 @@ class InfiniteTalkModelService:
             raise
     
     def extend_audio(self, audio_path, motion_frame=9):
-        """延長音頻以滿足 motion_frame 需求"""
         try:
             audio_data, sample_rate = sf.read(audio_path)
             min_duration = (motion_frame / 8.0) + 0.5
@@ -112,12 +134,36 @@ class InfiniteTalkModelService:
                  audio_path, 
                  prompt,
                  output_path,
-                 resolution='480',
-                 sample_steps=8,
-                 motion_frame=9):
-        """生成影片"""
+                 quality='balanced',
+                 resolution=None,
+                 sample_steps=None,
+                 motion_frame=None):
         if not self.loaded:
             raise Exception("模型未載入")
+        
+        logger.info(f"🔍 收到品質: '{quality}'")
+        
+        if quality in QUALITY_PRESETS:
+            logger.info(f"✅ 找到品質預設")
+            preset = QUALITY_PRESETS[quality]
+            resolution = resolution or preset['resolution']
+            sample_steps = sample_steps or preset['sampling_steps']
+            motion_frame = motion_frame or preset['motion_frame']
+            use_teacache = preset['use_teacache']
+            teacache_thresh = preset['teacache_thresh']
+            
+            logger.info(f"🎨 使用品質: {quality}")
+            logger.info(f"   解析度: {resolution}P")
+            logger.info(f"   採樣步數: {sample_steps}")
+            logger.info(f"   動作幀: {motion_frame}")
+            logger.info(f"   TeaCache: {use_teacache}")
+        else:
+            logger.warning(f"⚠️ 品質 '{quality}' 不在預設中")
+            resolution = resolution or '480'
+            sample_steps = sample_steps or 8
+            motion_frame = motion_frame or 9
+            use_teacache = False
+            teacache_thresh = 1.0
         
         logger.info(f"🎬 {output_path}")
         
@@ -143,9 +189,8 @@ class InfiniteTalkModelService:
                 device='cuda'
             )
             
-            # 關鍵修改：根據 audio embedding 的實際長度設置 max_frames
             actual_audio_frames = audio_embedding.shape[0]
-            max_frames = actual_audio_frames + 20  # 加一些緩衝
+            max_frames = actual_audio_frames + 20
             
             logger.info(f"📊 音頻時長: {audio_duration:.2f}秒")
             logger.info(f"📊 Audio embedding 幀數: {actual_audio_frames}")
@@ -162,14 +207,15 @@ class InfiniteTalkModelService:
             }
             
             extra_args = SimpleNamespace(
-                use_teacache=False,
-                teacache_thresh=1.0,
+                use_teacache=use_teacache,
+                teacache_thresh=teacache_thresh,
                 use_apg=False,
                 audio_mode='localfile',
-                scene_seg=False
+                scene_seg=False,
+                size=1.0
             )
             
-            logger.info(f"🚀 開始生成...")
+            logger.info(f"🚀 開始生成 (steps={sample_steps}, motion={motion_frame})...")
             
             video = self.wan_i2v.generate_infinitetalk(
                 input_clip,
@@ -181,7 +227,7 @@ class InfiniteTalkModelService:
                 audio_guide_scale=2.0,
                 seed=0,
                 offload_model=False,
-                max_frames_num=max_frames,  # 使用正確的幀數
+                max_frames_num=max_frames,
                 color_correction_strength=0.0,
                 extra_args=extra_args
             )

@@ -4,8 +4,8 @@ import os
 import uuid
 import time
 import logging
+import socket
 
-# 導入我們的常駐模型服務
 from model_service import get_model_service
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -24,20 +24,30 @@ class InfiniteTalkWorker:
         os.makedirs(self.temp_dir, exist_ok=True)
         os.makedirs(self.output_dir, exist_ok=True)
         
-        # ✨ 啟動時載入模型一次 (常駐記憶體)
+        self.worker_id = self._generate_worker_id()
+        
         logger.info("=" * 70)
         logger.info("🚀 初始化 Worker - 載入模型 (只執行一次)")
+        logger.info(f"🆔 Worker ID: {self.worker_id}")
         logger.info("=" * 70)
         self.model_service = get_model_service()
         logger.info("=" * 70)
         logger.info("✅ Worker 準備就緒!")
         logger.info("=" * 70)
     
+    def _generate_worker_id(self):
+        if os.getenv('WORKER_ID'):
+            return os.getenv('WORKER_ID')
+        
+        hostname = socket.gethostname()
+        short_uuid = str(uuid.uuid4())[:8]
+        return f"worker-{hostname}-{short_uuid}"
+    
     def fetch_task(self):
-        """獲取待處理任務"""
         try:
             logger.info("查詢待處理任務...")
-            response = requests.get(self.task_api, timeout=30)
+            url = f"{self.task_api}&worker_id={self.worker_id}"
+            response = requests.get(url, timeout=30)
             
             if response.status_code == 200:
                 result = response.json()
@@ -58,7 +68,6 @@ class InfiniteTalkWorker:
             return []
     
     def download_file(self, url, save_path):
-        """下載文件"""
         try:
             logger.info(f"下載: {url}")
             response = requests.get(url, timeout=300, stream=True)
@@ -77,30 +86,29 @@ class InfiniteTalkWorker:
             logger.error(f"下載錯誤: {e}")
             return False
     
-    def generate_video(self, image_path, audio_path, prompt, task_id):
-        """生成影片 - 使用常駐模型"""
+    def generate_video(self, image_path, audio_path, prompt, task_id, quality='balanced'):
         try:
             output_path = os.path.join(self.output_dir, f"{task_id}_output")
             
-            # ✨ 直接使用常駐的模型服務生成 (不需要重新載入)
+            start_time = time.time()
+            
             final_path = self.model_service.generate(
                 image_path=image_path,
                 audio_path=audio_path,
                 prompt=prompt,
                 output_path=output_path,
-                resolution='480',
-                sample_steps=8,
-                motion_frame=9
+                quality=quality
             )
             
-            return final_path
+            generation_time = int((time.time() - start_time) / 60)
+            
+            return final_path, generation_time
                 
         except Exception as e:
             logger.error(f"生成失敗: {e}")
-            return None
+            return None, 0
     
     def upload_video(self, video_path, task_id):
-        """上傳影片到服務器"""
         try:
             logger.info(f"📤 上傳影片: {video_path}")
             
@@ -125,14 +133,16 @@ class InfiniteTalkWorker:
             logger.error(f"上傳錯誤: {e}")
             return None
     
-    def report_result(self, task_pk, video_url):
-        """回報任務結果"""
+    def report_result(self, task_pk, video_url, quality, generation_time):
         try:
             logger.info(f"📮 回報結果 - 任務PK: {task_pk}")
             
             data = {
                 "video_generation_image_audio_pk": task_pk,
-                "video_url": video_url
+                "video_url": video_url,
+                "worker_id": self.worker_id,
+                "quality": quality,
+                "generation_time": generation_time
             }
             
             response = requests.post(self.result_api, json=data, timeout=30)
@@ -142,6 +152,9 @@ class InfiniteTalkWorker:
                 
                 if result.get("success"):
                     logger.info("✅ 結果回報成功")
+                    logger.info(f"   Worker: {self.worker_id}")
+                    logger.info(f"   Quality: {quality}")
+                    logger.info(f"   Time: {generation_time} 分鐘")
                     return True
                 else:
                     logger.error(f"❌ 回報失敗: {result.get('error')}")
@@ -155,7 +168,6 @@ class InfiniteTalkWorker:
             return False
     
     def cleanup(self, task_id):
-        """清理臨時文件"""
         try:
             files_to_delete = [
                 os.path.join(self.temp_dir, f"{task_id}_image.jpg"),
@@ -172,17 +184,17 @@ class InfiniteTalkWorker:
             logger.error(f"清理錯誤: {e}")
     
     def process_task(self, task):
-        """處理單個任務"""
         task_id = str(uuid.uuid4())
         task_pk = task["video_generation_image_audio_pk"]
+        quality = task.get("quality", "balanced")
         
         logger.info("=" * 70)
         logger.info(f"🎬 處理任務 PK: {task_pk}")
         logger.info(f"📝 Prompt: {task['prompt']}")
+        logger.info(f"🎨 Quality: {quality}")
         logger.info("=" * 70)
         
         try:
-            # 1. 下載圖片和音頻
             image_path = os.path.join(self.temp_dir, f"{task_id}_image.jpg")
             audio_path = os.path.join(self.temp_dir, f"{task_id}_audio.wav")
             
@@ -192,27 +204,27 @@ class InfiniteTalkWorker:
             if not self.download_file(task["sound_model_url"], audio_path):
                 raise Exception("下載音頻失敗")
             
-            # 2. 生成影片 (使用常駐模型,超快!)
-            video_path = self.generate_video(image_path, audio_path, task["prompt"], task_id)
+            video_path, generation_time = self.generate_video(
+                image_path, audio_path, task["prompt"], task_id, quality
+            )
             
             if not video_path:
                 raise Exception("生成影片失敗")
             
-            # 3. 上傳影片
             video_url = self.upload_video(video_path, task_id)
             
             if not video_url:
                 raise Exception("上傳影片失敗")
             
-            # 4. 回報結果
-            if not self.report_result(task_pk, video_url):
+            if not self.report_result(task_pk, video_url, quality, generation_time):
                 raise Exception("回報結果失敗")
             
-            # 5. 清理文件
             self.cleanup(task_id)
             
             logger.info("=" * 70)
             logger.info("✅ 任務完成!")
+            logger.info(f"   品質: {quality}")
+            logger.info(f"   耗時: {generation_time} 分鐘")
             logger.info("=" * 70)
             return True
             
@@ -222,15 +234,14 @@ class InfiniteTalkWorker:
             return False
     
     def run(self, poll_interval=30):
-        """持續運行 worker"""
         logger.info("=" * 70)
         logger.info("🤖 InfiniteTalk Worker 運行中...")
+        logger.info(f"🆔 Worker ID: {self.worker_id}")
         logger.info(f"⏱️  輪詢間隔: {poll_interval} 秒")
         logger.info("=" * 70)
         
         while True:
             try:
-                # 獲取任務
                 tasks = self.fetch_task()
                 
                 if tasks:
