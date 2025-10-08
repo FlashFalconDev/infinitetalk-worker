@@ -794,7 +794,6 @@ class InfiniteTalkPipeline:
                 gen_video_list.append(videos[:, :, cur_motion_frames_num:])
 
             # decide whether is done
-            print(f"DEBUG: Loop iteration - audio_start_idx={audio_start_idx}, audio_end_idx={audio_end_idx}, arrive_last_frame={arrive_last_frame}, gen_video_list_len={len(gen_video_list)}")
             if arrive_last_frame: break
 
             # update next condition frames
@@ -813,7 +812,7 @@ class InfiniteTalkPipeline:
             cond_image = cond_image.to(self.device)  # 1 C 1 H W
 
             # Repeat audio emb
-            if audio_start_idx >= len(full_audio_embs[0]):
+            if audio_end_idx >= min(max_frames_num, len(full_audio_embs[0])):
                 arrive_last_frame = True
                 miss_lengths = []
                 source_frames = []
@@ -829,7 +828,7 @@ class InfiniteTalkPipeline:
                         miss_lengths.append(0)
 
             
-            # # if max_frames_num <= frame_num: break  # 已註解：改用 arrive_last_frame  # 已註解：改用 arrive_last_frame
+            if max_frames_num <= frame_num: break
             
             torch_gc()
             if offload_model:    

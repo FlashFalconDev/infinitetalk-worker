@@ -1,25 +1,20 @@
-# 模型權重 (太大,不要上傳)
+# 模型权重（太大，不要上传）
 weights/
 *.safetensors
+*.pt
 *.pth
-*.bin
+*.ckpt
 
-# 生成的文件
+# 临时文件
+temp_*/
 outputs/
-temp_uploads/
-temp_downloads/
-*.mp4
-*.wav
-*.jpg
-*.png
-
-# Python
-__pycache__/
 *.pyc
-*.pyo
-*.log
-.ipynb_checkpoints/
+__pycache__/
+.DS_Store
 
-# 環境
-infinitetalk-env/
-venv/
+# 环境配置
+.env
+*.log
+
+# 下载的文件
+temp_downloads/
