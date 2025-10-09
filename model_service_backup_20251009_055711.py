@@ -1,6 +1,6 @@
 """
-InfiniteTalk 模型服務 - 最終優化版 v7.1
-支援字串預設配置 + 字典自訂配置
+InfiniteTalk 模型服務 - 最終優化版
+根據實測結果精心調整
 """
 import torch
 import os
@@ -23,56 +23,49 @@ from generate_infinitetalk import audio_prepare_single, get_embedding
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+# 設定環境變數優化顯存
 os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
 
 QUALITY_PRESETS = {
-    'ultra_fast': {
-        'resolution': '480',
-        'sampling_steps': 3,
-        'motion_frame': 3,
-        'mode': 'streaming',
-        'est_time': '12分',
-        'description': '⚡⚡⚡ 超快速 480P (3步+3幀 12分) - 極限速度測試'
-    },
     'turbo': {
         'resolution': '480',
         'sampling_steps': 4,
         'motion_frame': 4,
-        'mode': 'streaming',
-        'est_time': '18分',
-        'description': '⚡⚡ 極速 480P (4步+4幀 18分) - 快速預覽'
+        'use_teacache': True,          # ← 啟用 TeaCache 加速
+        'teacache_thresh': 0.3,        # ← 閾值 0.3
+        'description': '⚡ 極速測試 480P (4步+4幀+TeaCache 15分) - 快速預覽'
     },
     'fast': {
         'resolution': '480',
         'sampling_steps': 6,
         'motion_frame': 7,
-        'mode': 'streaming',
-        'est_time': '35分',
-        'description': '⚡ 快速 480P (6步+7幀 35分) - 測試推薦 ★'
+        'use_teacache': True,          # ← 啟用 TeaCache 加速
+        'teacache_thresh': 0.3,
+        'description': '⚡⚡ 快速生成 480P (6步+7幀+TeaCache 28分) - 測試可用'
     },
     'balanced': {
         'resolution': '480',
         'sampling_steps': 7,
         'motion_frame': 8,
-        'mode': 'streaming',
-        'est_time': '50分',
-        'description': '⭐⭐⭐⭐⭐ 日常推薦 480P (7步+8幀 50分) - 最佳平衡 ★★★'
+        'use_teacache': False,         # ← 品質優先，不用 TeaCache
+        'teacache_thresh': 1.0,
+        'description': '⭐⭐⭐⭐⭐ 日常推薦 480P (7步+8幀 50分) - 品質與速度最佳平衡'
     },
     'high': {
         'resolution': '480',
         'sampling_steps': 8,
         'motion_frame': 9,
-        'mode': 'streaming',
-        'est_time': '70分',
-        'description': '⭐⭐⭐⭐ 高品質 480P (8步+9幀 70分) - 細節豐富'
+        'use_teacache': False,
+        'teacache_thresh': 1.0,
+        'description': '⭐⭐⭐⭐ 高品質 480P (8步+9幀 70分) - 細節豐富，手部清晰'
     },
     'ultra': {
         'resolution': '720',
         'sampling_steps': 8,
         'motion_frame': 9,
-        'mode': 'streaming',
-        'est_time': '120分',
-        'description': '⭐⭐ 極致品質 720P (8步+9幀 120分) - 原生高清'
+        'use_teacache': False,
+        'teacache_thresh': 1.0,
+        'description': '⭐⭐ 極致品質 720P (8步+9幀 120分) - 原生高清，需充足顯存'
     }
 }
 
@@ -95,66 +88,64 @@ class InfiniteTalkModelService:
         self.wav2vec_feature_extractor = None
         self.audio_encoder = None
         
+        # 檢查 LoRA
         lora_exists = os.path.exists(lora_dir)
-        logger.info("=" * 80)
+        logger.info("=" * 70)
         logger.info(f"🎨 LoRA 配置:")
         logger.info(f"   路徑: {lora_dir}")
         logger.info(f"   狀態: {'✅ 存在' if lora_exists else '❌ 不存在'}")
         if lora_exists:
             size_mb = os.path.getsize(lora_dir) / (1024*1024)
             logger.info(f"   大小: {size_mb:.1f} MB")
-        logger.info("=" * 80)
+        logger.info("=" * 70)
         
-        logger.info("📊 品質方案 (6 檔精選 - 最終優化版 v7.1)")
+        logger.info("📊 品質方案 (5檔精選):")
         logger.info("")
-        logger.info("   ⚡ 快速測試 (降低 steps/frames):")
-        logger.info("   ├─ Ultra Fast - 12分  (3步+3幀)           極限速度")
-        logger.info("   ├─ Turbo      - 18分  (4步+4幀)           快速預覽")
-        logger.info("   └─ Fast       - 35分  (6步+7幀)           測試推薦 ★")
+        logger.info("   ⚡ 快速測試:")
+        logger.info("   ├─ Turbo    - 15分  (4步+4幀+TeaCache)  極速預覽")
+        logger.info("   └─ Fast     - 28分  (6步+7幀+TeaCache)  測試可用")
         logger.info("")
         logger.info("   ⭐ 日常使用:")
-        logger.info("   └─ Balanced   - 50分  (7步+8幀)           品質速度最佳 ★★★")
+        logger.info("   └─ Balanced - 50分  (7步+8幀)           品質速度平衡 ★推薦★")
         logger.info("")
         logger.info("   🎨 高品質:")
-        logger.info("   ├─ High       - 70分  (8步+9幀)           細節豐富")
-        logger.info("   └─ Ultra      - 120分 (720P 8步+9幀)      原生高清")
+        logger.info("   ├─ High     - 70分  (8步+9幀)           細節豐富")
+        logger.info("   └─ Ultra    - 120分 (720P 8步+9幀)      原生高清")
         logger.info("")
-        logger.info("   💡 支援自訂配置: 傳入字典即可覆蓋預設參數")
-        logger.info("=" * 80)
+        logger.info("   💡 TeaCache: Turbo/Fast 啟用，可節省 30% 時間")
+        logger.info("   💡 同一模型支援 480P/720P 切換")
+        logger.info("=" * 70)
     
     def load_models(self):
         """載入模型（啟動時調用）"""
         if self.loaded:
             return
         
-        logger.info("=" * 80)
-        logger.info("🚀 載入模型（最終優化版 v7.1）...")
-        logger.info("=" * 80)
+        logger.info("=" * 70)
+        logger.info("🚀 載入模型（顯存優化模式）...")
+        logger.info("=" * 70)
         
         try:
+            # 預先清理顯存
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
                 import gc
                 gc.collect()
             
-            logger.info("📥 載入 wav2vec2...")
+            logger.info("📥 wav2vec2...")
             self.wav2vec_feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(
                 self.wav2vec_dir
             )
             self.audio_encoder = Wav2Vec2Model.from_pretrained(
                 self.wav2vec_dir
             ).to(self.device)
-            logger.info("✅ wav2vec2 完成")
+            logger.info("✅ wav2vec2")
             
-            logger.info("📥 載入 InfiniteTalk...")
+            logger.info("📥 InfiniteTalk...")
             logger.info(f"   LoRA: {os.path.basename(self.lora_dir)}")
-            logger.info(f"   LoRA Scale: 1.0")
-            logger.info(f"   Text Guide: 1.0 (使用 LoRA)")
-            logger.info(f"   Audio Guide: 2.0 (使用 LoRA)")
+            logger.info(f"   Scale: 1.0")
             logger.info(f"   解析度: 480P / 720P")
-            logger.info(f"   加速方式: 降低 steps/frames（穩定可靠）")
             logger.info(f"   VRAM 管理: 啟用 (num_persistent=0)")
-            
             cfg = WAN_CONFIGS['infinitetalk-14B']
             
             self.wan_i2v = wan.InfiniteTalkPipeline(
@@ -167,22 +158,24 @@ class InfiniteTalkModelService:
                 infinitetalk_dir=self.infinitetalk_dir
             )
             
+            # 啟用最激進的顯存管理
             self.wan_i2v.vram_management = True
             self.wan_i2v.enable_vram_management(num_persistent_param_in_dit=0)
             
-            logger.info("✅ InfiniteTalk 完成")
+            logger.info("✅ InfiniteTalk")
             self.loaded = True
             
+            # 顯示顯存狀態
             if torch.cuda.is_available():
                 allocated = torch.cuda.memory_allocated() / (1024**3)
                 reserved = torch.cuda.memory_reserved() / (1024**3)
                 total = torch.cuda.get_device_properties(0).total_memory / (1024**3)
                 free = total - allocated
-                logger.info(f"📊 GPU 顯存: {allocated:.1f}GB 使用 / {free:.1f}GB 可用 / {total:.1f}GB 總量")
+                logger.info(f"📊 GPU 顯存: {allocated:.1f}GB 使用中 / {free:.1f}GB 可用 / {total:.1f}GB 總量")
             
-            logger.info("=" * 80)
-            logger.info("🎉 模型已常駐！ (最終優化版 v7.1)")
-            logger.info("=" * 80)
+            logger.info("=" * 70)
+            logger.info("🎉 模型已常駐!")
+            logger.info("=" * 70)
             
         except Exception as e:
             logger.error(f"❌ 載入失敗: {e}")
@@ -210,50 +203,6 @@ class InfiniteTalkModelService:
             logger.error(f"❌ 音頻處理失敗: {e}")
             return False
     
-    def _parse_quality_config(self, quality):
-        """
-        解析品質配置
-        支援兩種格式:
-        1. 字串: 'fast', 'balanced' 等預設配置
-        2. 字典: 自訂配置參數
-        
-        返回: (preset_dict, config_type, config_name)
-        """
-        # 判斷是字典還是字串
-        if isinstance(quality, dict):
-            logger.info("🔧 使用自訂配置（字典格式）")
-            
-            # 必要參數檢查
-            required_params = ['sampling_steps', 'motion_frame']
-            missing_params = [p for p in required_params if p not in quality]
-            
-            if missing_params:
-                raise ValueError(f"❌ 自訂配置缺少必要參數: {missing_params}")
-            
-            # 設定預設值
-            preset = {
-                'resolution': quality.get('resolution', '480'),
-                'sampling_steps': quality['sampling_steps'],
-                'motion_frame': quality['motion_frame'],
-                'mode': quality.get('mode', 'streaming'),
-                'est_time': quality.get('est_time', '未知'),
-                'description': quality.get('description', '自訂配置')
-            }
-            
-            return preset, 'custom', 'custom'
-            
-        elif isinstance(quality, str):
-            logger.info(f"📋 使用預設配置: '{quality}'")
-            
-            if quality not in QUALITY_PRESETS:
-                logger.warning(f"⚠️  未知品質 '{quality}'，使用 balanced")
-                quality = 'balanced'
-            
-            return QUALITY_PRESETS[quality], 'preset', quality
-            
-        else:
-            raise TypeError(f"❌ quality 參數類型錯誤: {type(quality)}，應為 str 或 dict")
-    
     def generate(self, 
                  image_path, 
                  audio_path, 
@@ -261,68 +210,39 @@ class InfiniteTalkModelService:
                  output_path,
                  quality='balanced',
                  **kwargs):
-        """
-        統一生成接口
-        
-        參數:
-            quality: str 或 dict
-                - str: 預設配置名稱 ('ultra_fast', 'turbo', 'fast', 'balanced', 'high', 'ultra')
-                - dict: 自訂配置，必須包含:
-                    - sampling_steps (必要): int, 採樣步數
-                    - motion_frame (必要): int, 動作幀數
-                    - resolution (可選): str, '480' 或 '720', 預設 '480'
-                    - mode (可選): str, 預設 'streaming'
-                    - est_time (可選): str, 預估時間說明
-                    - description (可選): str, 配置描述
-        
-        範例:
-            # 使用預設配置
-            generate(..., quality='fast')
-            
-            # 使用自訂配置
-            generate(..., quality={
-                'sampling_steps': 5,
-                'motion_frame': 6,
-                'resolution': '480',
-                'description': '自訂快速配置'
-            })
-        """
+        """統一生成接口"""
         
         if not self.loaded:
             raise Exception("模型未載入！請確保已調用 load_models()")
         
-        # 解析配置
-        try:
-            preset, config_type, config_name = self._parse_quality_config(quality)
-        except (ValueError, TypeError) as e:
-            logger.error(str(e))
-            raise
+        logger.info(f"🔍 品質: '{quality}'")
+        
+        if quality not in QUALITY_PRESETS:
+            logger.warning(f"⚠️  未知品質 '{quality}'，使用 balanced")
+            quality = 'balanced'
+        
+        preset = QUALITY_PRESETS[quality]
         
         # 提取參數
         resolution = preset['resolution']
         sample_steps = preset['sampling_steps']
         motion_frame = preset['motion_frame']
-        mode = preset['mode']
-        est_time = preset.get('est_time', '未知')
-        description = preset.get('description', '自訂配置')
+        use_teacache = preset['use_teacache']
+        teacache_thresh = preset['teacache_thresh']
         
-        # 顯示配置資訊
-        logger.info("=" * 80)
-        if config_type == 'custom':
-            logger.info(f"🎨 自訂配置")
-        else:
-            logger.info(f"🎨 {config_name.upper()}")
-        logger.info(f"   {description}")
-        logger.info(f"   參數: {resolution}P, {sample_steps}步, {motion_frame}幀, mode={mode}")
-        logger.info(f"   預估時間: {est_time}")
-        logger.info("=" * 80)
+        logger.info(f"🎨 {quality}")
+        logger.info(f"   {preset['description']}")
+        logger.info(f"   參數: {resolution}P, {sample_steps}步, {motion_frame}幀" + 
+                   (", TeaCache" if use_teacache else ""))
         
+        # 生成前清理顯存
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
             import gc
             gc.collect()
         
         try:
+            # 音頻處理
             if not self.extend_audio(audio_path, motion_frame):
                 raise Exception("音頻處理失敗")
             
@@ -348,7 +268,6 @@ class InfiniteTalkModelService:
             max_frames = actual_audio_frames + 20
             
             logger.info(f"📊 音頻: {audio_duration:.2f}秒, {actual_audio_frames}幀")
-            logger.info(f"📊 最大幀數: {max_frames} (約 {max_frames/25:.1f}秒)")
             
             emb_path = os.path.join(temp_dir, 'audio_emb.pt')
             torch.save(audio_embedding, emb_path)
@@ -360,21 +279,18 @@ class InfiniteTalkModelService:
                 'video_audio': sum_audio
             }
             
-            # 簡潔穩定的配置
             extra_args = SimpleNamespace(
-                use_teacache=False,
-                teacache_thresh=1.0,
+                use_teacache=use_teacache,
+                teacache_thresh=teacache_thresh,
                 use_apg=False,
                 audio_mode='localfile',
                 scene_seg=False,
                 size=1.0
             )
             
-            logger.info(f"🚀 開始生成 ({resolution}P, {mode} 模式)...")
+            logger.info(f"🚀 開始生成 ({resolution}P)...")
             
-            import time
-            start_time = time.time()
-            
+            # 生成
             video = self.wan_i2v.generate_infinitetalk(
                 input_clip,
                 size_buckget=f'infinitetalk-{resolution}',
@@ -390,13 +306,9 @@ class InfiniteTalkModelService:
                 extra_args=extra_args
             )
             
-            elapsed_time = time.time() - start_time
-            
             if hasattr(video, 'shape'):
                 actual_frames = video.shape[2] if len(video.shape) > 2 else 0
-                logger.info(f"📹 生成: {actual_frames}幀 ({actual_frames/25:.1f}秒)")
-            
-            logger.info(f"⏱️  實際耗時: {elapsed_time/60:.1f}分鐘 (預估: {est_time})")
+                logger.info(f"📹 生成: {actual_frames}幀")
             
             logger.info("💾 保存...")
             save_video_ffmpeg(video, output_path, [sum_audio], high_quality_save=False)
@@ -415,19 +327,16 @@ class InfiniteTalkModelService:
                     video_duration = float(result.stdout.strip())
                     logger.info(f"✅ 視頻: {video_duration:.2f}秒 / 音頻: {audio_duration:.2f}秒")
             
+            # 清理
             import shutil
             shutil.rmtree(temp_dir, ignore_errors=True)
             
+            # 生成後清理顯存
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
                 gc.collect()
             
             logger.info(f"✅ 完成: {final_path}")
-            if config_type == 'custom':
-                logger.info(f"📊 性能統計: 自訂配置 ({sample_steps}步+{motion_frame}幀)，{elapsed_time/60:.1f}分鐘")
-            else:
-                logger.info(f"📊 性能統計: {config_name} 模式，{elapsed_time/60:.1f}分鐘")
-            
             return final_path
             
         except torch.cuda.OutOfMemoryError as e:
@@ -436,10 +345,9 @@ class InfiniteTalkModelService:
                 allocated = torch.cuda.memory_allocated() / (1024**3)
                 logger.error(f"   當前使用: {allocated:.1f}GB")
             logger.error("💡 解決方案:")
-            logger.error("   1. 使用更低品質: ultra_fast/turbo/fast")
-            logger.error("   2. 降低解析度: ultra → balanced (720P → 480P)")
-            logger.error("   3. 降低自訂參數: sampling_steps 和 motion_frame")
-            logger.error("   4. 檢查其他進程: nvidia-smi")
+            logger.error("   1. 使用較低品質 (turbo/fast/balanced)")
+            logger.error("   2. 執行: nvidia-smi 查看其他進程")
+            logger.error("   3. 停止不必要的 GPU 進程")
             torch.cuda.empty_cache()
             raise
         except Exception as e:
@@ -459,20 +367,4 @@ def get_model_service():
 
 if __name__ == "__main__":
     service = get_model_service()
-    print("✅ 服務就緒 - 最終優化版 v7.1")
-    print("")
-    print("📊 使用方式:")
-    print("")
-    print("1️⃣  預設配置（字串）:")
-    print("   service.generate(..., quality='fast')")
-    print("")
-    print("2️⃣  自訂配置（字典）:")
-    print("   service.generate(..., quality={")
-    print("       'sampling_steps': 5,")
-    print("       'motion_frame': 6,")
-    print("       'resolution': '480',  # 可選")
-    print("       'description': '我的配置'  # 可選")
-    print("   })")
-    print("")
-    print("📋 預設配置:")
-    print("   ultra_fast / turbo / fast / balanced / high / ultra")
+    print("✅ 服務就緒 - 5 檔精選配置 (TeaCache 加速 + 顯存優化)")
