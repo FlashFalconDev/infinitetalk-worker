@@ -18,3 +18,21 @@ __pycache__/
 
 # 下载的文件
 temp_downloads/
+
+# 備份檔案
+*.backup
+*_backup_*.py
+model_service_with_realesrgan_backup.py
+fix_realesrgan_*.sh
+
+# 備份檔案
+*.backup
+*_backup_*.py
+model_service_with_realesrgan_backup.py
+fix_realesrgan_*.sh
+
+# 備份檔案
+*.backup
+*_backup_*.py
+model_service_with_realesrgan_backup.py
+fix_realesrgan_*.sh
