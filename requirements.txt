@@ -1,21 +1,32 @@
-opencv-python>=4.9.0.80
-diffusers>=0.31.0
-transformers>=4.49.0
-tokenizers>=0.20.3
-accelerate>=1.1.1
-tqdm
-imageio
-easydict
-ftfy
-dashscope
-imageio-ffmpeg
-scikit-image   
-loguru
-gradio>=5.0.0
-numpy>=1.23.5,<2
-xfuser>=0.4.1
-pyloudnorm
-optimum-quanto==0.2.6
-scenedetect
-moviepy==1.0.3
-decord
+# Core Dependencies
+torch>=2.0.0
+torchvision
+torchaudio
+diffusers>=0.25.0
+transformers>=4.36.0
+accelerate>=0.25.0
+xformers>=0.0.23
+
+# Image Processing
+opencv-python>=4.8.0
+pillow>=10.0.0
+numpy>=1.24.0
+
+# Networking
+requests>=2.31.0
+
+# Configuration
+python-dotenv>=1.0.0
+
+# GPU Monitoring
+nvidia-ml-py3>=7.352.0
+
+# LoRA & Fine-tuning
+peft>=0.7.0
+
+# Audio Processing
+soundfile>=0.12.0
+librosa>=0.10.0
+
+# Utilities
+tqdm>=4.66.0

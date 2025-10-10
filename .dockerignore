@@ -1,0 +1,48 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# 環境變數
+.env
+.env.local
+.env.*.local
+
+# 臨時文件
+temp_downloads/
+outputs/
+*.log
+
+# 備份文件
+*.bak
+*.backup
+*_old*
+*_backup*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 測試
+tests/
+test_*.py
+
+# 文檔
+docs/
+*.md
+!README.md
+
+# 其他
+*.DS_Store
+Thumbs.db
