@@ -1,6 +1,6 @@
 """
-InfiniteTalk Worker - 修正版
-修正 GPU 資訊的 JSON 序列化問題
+InfiniteTalk Worker - v7.3
+主備 API 切換機制
 """
 import requests
 import json
@@ -22,30 +22,27 @@ logger = logging.getLogger(__name__)
 
 class InfiniteTalkWorker:
     def __init__(self):
-        # ===== 配置讀取 =====
-        self.base_url = os.getenv('INFINITETALK_API_BASE', 'https://host.flashfalcon.info')
+        # ===== API 配置（主備切換）=====
+        self.primary_base = "https://www.flashfalcon.info"    # 主 API
+        self.backup_base = "https://host.flashfalcon.info"    # 備用 API
+        self.current_base = self.primary_base                  # 當前使用的 API
+        
+        # 失敗計數器
+        self.primary_fail_count = 0
+        self.max_fails_before_switch = 2  # 連續失敗 2 次切換到備用
+        
+        # Token
         self.worker_token = os.getenv('INFINITETALK_WORKER_TOKEN')
         
         if not self.worker_token:
             logger.error("=" * 70)
             logger.error("❌ 缺少環境變數: INFINITETALK_WORKER_TOKEN")
-            logger.error("")
-            logger.error("請執行以下步驟:")
-            logger.error("1. 複製範例: cp .env.example .env")
-            logger.error("2. 編輯檔案: nano .env")
-            logger.error("3. 填入從 Admin 後台複製的 Token")
             logger.error("=" * 70)
             raise ValueError("Missing INFINITETALK_WORKER_TOKEN")
         
-        # API 端點
-        self.heartbeat_api = f"{self.base_url}/ai/api/worker/heartbeat"
-        self.task_api = f"{self.base_url}/aigen/api/pending_task/"
-        self.result_api = f"{self.base_url}/aigen/api/task_result/"
-        self.upload_api = f"{self.base_url}/api/save_file/"
-        
         # Worker 資訊
         self.worker_id = self._generate_worker_id()
-        self.worker_version = "7.2"
+        self.worker_version = "7.3"  # 版本升級
         
         # 目錄設定
         self.temp_dir = "temp_downloads"
@@ -53,21 +50,22 @@ class InfiniteTalkWorker:
         os.makedirs(self.temp_dir, exist_ok=True)
         os.makedirs(self.output_dir, exist_ok=True)
         
-        # ✅ 檢查 GPU 監控能力
+        # 檢查 GPU 監控
         self.gpu_monitoring_available = self._check_gpu_monitoring()
         
         # 初始化
         logger.info("=" * 70)
-        logger.info("🚀 初始化 InfiniteTalk Worker v7.2 (增強版)")
+        logger.info("🚀 初始化 InfiniteTalk Worker v7.3")
         logger.info(f"🆔 Worker ID: {self.worker_id}")
         logger.info(f"🔑 Token: {self.worker_token[:10]}...{self.worker_token[-10:]}")
-        logger.info(f"🌐 API Base: {self.base_url}")
+        logger.info(f"🌐 主 API: {self.primary_base}")
+        logger.info(f"🔄 備用 API: {self.backup_base}")
         logger.info(f"📊 GPU 監控: {'✅ 已啟用' if self.gpu_monitoring_available else '⚠️  基本模式'}")
         logger.info("=" * 70)
         
         # 測試連線
         if not self._test_connection():
-            raise ConnectionError("❌ 無法連接到伺服器，請檢查 Token 是否正確")
+            raise ConnectionError("❌ 無法連接到伺服器")
         
         # 載入模型
         logger.info("📥 載入模型（只執行一次）...")
@@ -80,6 +78,99 @@ class InfiniteTalkWorker:
         logger.info("✅ Worker 準備就緒!")
         logger.info("=" * 70)
     
+    def _get_api_endpoints(self):
+        """✅ 動態獲取 API 端點"""
+        return {
+            'heartbeat': f"{self.current_base}/ai/api/worker/heartbeat",
+            'task': f"{self.current_base}/ai/api/pending_task/",
+            'result': f"{self.current_base}/ai/api/task_result/",
+            'upload': f"{self.current_base}/api/save_file/"
+        }
+    
+    def _switch_to_backup(self):
+        """✅ 切換到備用 API"""
+        if self.current_base == self.primary_base:
+            logger.warning("⚠️  主 API 連續失敗，切換到備用 API")
+            self.current_base = self.backup_base
+            logger.info(f"🔄 當前使用: {self.current_base}")
+    
+    def _switch_to_primary(self):
+        """✅ 切回主 API"""
+        if self.current_base == self.backup_base:
+            logger.info("✅ 主 API 恢復正常，切回主 API")
+            self.current_base = self.primary_base
+            logger.info(f"🔄 當前使用: {self.current_base}")
+    
+    def _make_request(self, method, endpoint_key, **kwargs):
+        """
+        ✅ 統一的請求方法（帶主備切換）
+        
+        Args:
+            method: 'GET' or 'POST'
+            endpoint_key: 'heartbeat', 'task', 'result', 'upload'
+            **kwargs: requests 的其他參數
+        """
+        endpoints = self._get_api_endpoints()
+        url = endpoints[endpoint_key]
+        
+        try:
+            # 嘗試請求
+            if method.upper() == 'GET':
+                response = requests.get(url, **kwargs)
+            else:
+                response = requests.post(url, **kwargs)
+            
+            # 如果成功
+            if response.status_code in [200, 201]:
+                # ✅ 請求成功，重置失敗計數
+                if self.primary_fail_count > 0:
+                    self.primary_fail_count = 0
+                    logger.debug(f"✅ API 請求成功，重置失敗計數")
+                
+                # 如果當前使用備用 API，且主 API 已恢復，切回主 API
+                if self.current_base == self.backup_base:
+                    self._switch_to_primary()
+                
+                return response
+            
+            # HTTP 錯誤但不切換（如 401, 404）
+            elif response.status_code in [401, 403, 404]:
+                return response
+            
+            # 其他錯誤，計入失敗
+            else:
+                raise requests.exceptions.RequestException(f"HTTP {response.status_code}")
+        
+        except Exception as e:
+            logger.warning(f"⚠️  {endpoint_key} 請求失敗: {e}")
+            
+            # 只有主 API 失敗才計數
+            if self.current_base == self.primary_base:
+                self.primary_fail_count += 1
+                logger.warning(f"⚠️  主 API 失敗計數: {self.primary_fail_count}/{self.max_fails_before_switch}")
+                
+                # 達到閾值，切換到備用
+                if self.primary_fail_count >= self.max_fails_before_switch:
+                    self._switch_to_backup()
+                    self.primary_fail_count = 0
+                    
+                    # 用備用 API 重試
+                    logger.info("🔄 使用備用 API 重試...")
+                    endpoints = self._get_api_endpoints()
+                    url = endpoints[endpoint_key]
+                    
+                    try:
+                        if method.upper() == 'GET':
+                            response = requests.get(url, **kwargs)
+                        else:
+                            response = requests.post(url, **kwargs)
+                        return response
+                    except Exception as e2:
+                        logger.error(f"❌ 備用 API 也失敗: {e2}")
+                        return None
+            
+            return None
+    
     def _generate_worker_id(self):
         """生成 Worker ID"""
         if os.getenv('WORKER_ID'):
@@ -90,7 +181,7 @@ class InfiniteTalkWorker:
         return f"{hostname}-{short_uuid}"
     
     def _check_gpu_monitoring(self):
-        """檢查是否可以使用詳細的 GPU 監控"""
+        """檢查 GPU 監控"""
         try:
             import pynvml
             pynvml.nvmlInit()
@@ -100,7 +191,6 @@ class InfiniteTalkWorker:
             return True
         except ImportError:
             logger.warning("⚠️  未安裝 nvidia-ml-py3，使用基本 GPU 監控")
-            logger.info("   安裝方式: pip install nvidia-ml-py3")
             return False
         except Exception as e:
             logger.warning(f"⚠️  無法初始化 GPU 監控: {e}")
@@ -114,13 +204,12 @@ class InfiniteTalkWorker:
         }
     
     def _get_system_info(self):
-        """✅ 修正：獲取系統資訊（確保所有值都可 JSON 序列化）"""
+        """獲取系統資訊"""
         info = {
             'hostname': socket.gethostname(),
             'version': self.worker_version
         }
         
-        # GPU 基本資訊
         try:
             import torch
             if torch.cuda.is_available():
@@ -129,31 +218,28 @@ class InfiniteTalkWorker:
                     'name': torch.cuda.get_device_name(0),
                     'count': torch.cuda.device_count(),
                     'total_memory_gb': round(gpu_props.total_memory / 1024**3, 2),
-                    'cuda_version': str(torch.version.cuda),  # ✅ 轉為字串
-                    'pytorch_version': str(torch.__version__)  # ✅ 轉為字串
+                    'cuda_version': str(torch.version.cuda),
+                    'pytorch_version': str(torch.__version__)
                 }
                 
-                # ✅ 如果有詳細監控，加入驅動版本
                 if self.gpu_monitoring_available:
                     try:
                         import pynvml
                         pynvml.nvmlInit()
-                        # ✅ 關鍵修正：bytes 轉 string
                         driver_version = pynvml.nvmlSystemGetDriverVersion()
                         if isinstance(driver_version, bytes):
                             driver_version = driver_version.decode('utf-8')
                         info['gpu_info']['driver_version'] = driver_version
                         pynvml.nvmlShutdown()
-                    except Exception as e:
-                        logger.debug(f"無法獲取驅動版本: {e}")
-                
+                    except:
+                        pass
         except Exception as e:
             logger.warning(f"無法獲取 GPU 資訊: {e}")
         
         return info
     
     def _get_gpu_stats(self):
-        """✅ 修正：獲取詳細的 GPU 狀態（確保所有值都可 JSON 序列化）"""
+        """獲取 GPU 狀態"""
         stats = {}
         
         try:
@@ -161,7 +247,6 @@ class InfiniteTalkWorker:
             if not torch.cuda.is_available():
                 return stats
             
-            # 基本記憶體資訊（PyTorch）
             allocated = torch.cuda.memory_allocated(0) / 1024**3
             reserved = torch.cuda.memory_reserved(0) / 1024**3
             total = torch.cuda.get_device_properties(0).total_memory / 1024**3
@@ -171,7 +256,6 @@ class InfiniteTalkWorker:
             stats['gpu_memory_total'] = round(total, 2)
             stats['gpu_memory_utilization'] = round((allocated / total) * 100, 2)
             
-            # ✅ 詳細資訊（nvidia-ml-py3）
             if self.gpu_monitoring_available:
                 try:
                     import pynvml
@@ -179,16 +263,13 @@ class InfiniteTalkWorker:
                     
                     handle = pynvml.nvmlDeviceGetHandleByIndex(0)
                     
-                    # GPU 使用率
                     util = pynvml.nvmlDeviceGetUtilizationRates(handle)
-                    stats['gpu_utilization'] = int(util.gpu)  # ✅ 轉為 int
+                    stats['gpu_utilization'] = int(util.gpu)
                     stats['gpu_memory_controller_utilization'] = int(util.memory)
                     
-                    # GPU 溫度
                     temp = pynvml.nvmlDeviceGetTemperature(handle, pynvml.NVML_TEMPERATURE_GPU)
-                    stats['gpu_temperature'] = int(temp)  # ✅ 轉為 int
+                    stats['gpu_temperature'] = int(temp)
                     
-                    # GPU 功率
                     try:
                         power = pynvml.nvmlDeviceGetPowerUsage(handle) / 1000.0
                         power_limit = pynvml.nvmlDeviceGetPowerManagementLimit(handle) / 1000.0
@@ -198,7 +279,6 @@ class InfiniteTalkWorker:
                     except:
                         pass
                     
-                    # GPU 時鐘頻率
                     try:
                         clock_graphics = pynvml.nvmlDeviceGetClockInfo(handle, pynvml.NVML_CLOCK_GRAPHICS)
                         clock_memory = pynvml.nvmlDeviceGetClockInfo(handle, pynvml.NVML_CLOCK_MEM)
@@ -207,14 +287,12 @@ class InfiniteTalkWorker:
                     except:
                         pass
                     
-                    # GPU 風扇轉速
                     try:
                         fan_speed = pynvml.nvmlDeviceGetFanSpeed(handle)
                         stats['gpu_fan_speed'] = int(fan_speed)
                     except:
                         pass
                     
-                    # GPU 進程資訊
                     try:
                         processes = pynvml.nvmlDeviceGetComputeRunningProcesses(handle)
                         stats['gpu_process_count'] = len(processes)
@@ -244,43 +322,23 @@ class InfiniteTalkWorker:
                 **self._get_system_info()
             }
             
-            # ✅ 調試：顯示要發送的資料
-            logger.debug(f"發送資料: {json.dumps(data, indent=2)}")
+            # ✅ 使用統一請求方法
+            response = self._make_request('POST', 'heartbeat', json=data, headers=headers, timeout=10)
             
-            response = requests.post(
-                self.heartbeat_api,
-                json=data,
-                headers=headers,
-                timeout=10
-            )
-            
-            if response.status_code == 200:
+            if response and response.status_code == 200:
                 result = response.json()
                 if result.get('success'):
                     logger.info("✅ 連線成功")
+                    logger.info(f"   使用 API: {self.current_base}")
                     if 'data' in result and 'worker_name' in result['data']:
                         logger.info(f"   後端識別為: {result['data']['worker_name']}")
                     return True
-            elif response.status_code == 401:
-                logger.error("❌ Token 無效或已停用")
-                return False
-            else:
-                logger.error(f"❌ 連線失敗: HTTP {response.status_code}")
-                logger.error(f"   回應: {response.text}")
-                return False
+            
+            logger.error("❌ 連線失敗")
+            return False
                 
-        except requests.exceptions.ConnectionError:
-            logger.error(f"❌ 無法連接到 {self.base_url}")
-            return False
-        except json.JSONDecodeError as e:
-            logger.error(f"❌ JSON 序列化失敗: {e}")
-            import traceback
-            traceback.print_exc()
-            return False
         except Exception as e:
             logger.error(f"❌ 連線測試失敗: {e}")
-            import traceback
-            traceback.print_exc()
             return False
     
     def _send_heartbeat(self):
@@ -296,7 +354,6 @@ class InfiniteTalkWorker:
                 **self._get_gpu_stats()
             }
             
-            # 首次心跳顯示資料
             if not hasattr(self, '_first_heartbeat_logged'):
                 logger.info("📊 首次心跳資料:")
                 for key, value in data.items():
@@ -304,15 +361,11 @@ class InfiniteTalkWorker:
                         logger.info(f"   {key}: {value}")
                 self._first_heartbeat_logged = True
             
-            response = requests.post(
-                self.heartbeat_api,
-                json=data,
-                headers=headers,
-                timeout=10
-            )
+            # ✅ 使用統一請求方法
+            response = self._make_request('POST', 'heartbeat', json=data, headers=headers, timeout=10)
             
-            if response.status_code == 200:
-                logger.debug(f"💓 心跳發送成功")
+            if response and response.status_code == 200:
+                logger.debug(f"💓 心跳發送成功 ({self.current_base})")
                 
                 gpu_stats = self._get_gpu_stats()
                 if gpu_stats:
@@ -323,11 +376,11 @@ class InfiniteTalkWorker:
                     )
                 
                 return True
-            elif response.status_code == 401:
+            elif response and response.status_code == 401:
                 logger.error(f"❌ Token 已失效")
                 return False
             else:
-                logger.warning(f"⚠️  心跳失敗: HTTP {response.status_code}")
+                logger.warning(f"⚠️  心跳失敗")
                 return False
                 
         except Exception as e:
@@ -362,12 +415,11 @@ class InfiniteTalkWorker:
             params = {'model_code': 'InfiniteTalk_S2V'}
             headers = self._get_auth_headers()
             
-            response = requests.get(
-                self.task_api,
-                params=params,
-                headers=headers,
-                timeout=30
-            )
+            # ✅ 使用統一請求方法
+            response = self._make_request('GET', 'task', params=params, headers=headers, timeout=30)
+            
+            if not response:
+                return []
             
             if response.status_code == 401:
                 logger.error("❌ Token 已失效")
@@ -404,7 +456,7 @@ class InfiniteTalkWorker:
                     return []
                 
                 if len(tasks) > 0:
-                    logger.info(f"✅ 獲取到 {len(tasks)} 個任務")
+                    logger.info(f"✅ 獲取到 {len(tasks)} 個任務 (來自 {self.current_base})")
                     return tasks
                 
                 return []
@@ -469,7 +521,9 @@ class InfiniteTalkWorker:
             with open(video_path, "rb") as f:
                 files = {"file": (f"{task_id}.mp4", f, "video/mp4")}
                 
-                response = requests.post(self.upload_api, files=files, timeout=600)
+                # ✅ 使用統一請求方法（上傳特殊處理）
+                endpoints = self._get_api_endpoints()
+                response = requests.post(endpoints['upload'], files=files, timeout=600)
                 
                 if response.status_code == 200:
                     result = response.json()
@@ -502,14 +556,10 @@ class InfiniteTalkWorker:
             
             headers = self._get_auth_headers()
             
-            response = requests.post(
-                self.result_api,
-                json=data,
-                headers=headers,
-                timeout=30
-            )
+            # ✅ 使用統一請求方法
+            response = self._make_request('POST', 'result', json=data, headers=headers, timeout=30)
             
-            if response.status_code == 200:
+            if response and response.status_code == 200:
                 result = response.json()
                 
                 if result.get("success"):
@@ -519,7 +569,7 @@ class InfiniteTalkWorker:
                     logger.error(f"❌ 回報失敗: {result.get('error')}")
                     return False
             else:
-                logger.error(f"❌ HTTP 錯誤: {response.status_code}")
+                logger.error(f"❌ HTTP 錯誤: {response.status_code if response else 'None'}")
                 return False
                 
         except Exception as e:
@@ -599,6 +649,8 @@ class InfiniteTalkWorker:
         logger.info("=" * 70)
         logger.info("🤖 InfiniteTalk Worker 運行中...")
         logger.info(f"🆔 Worker ID: {self.worker_id}")
+        logger.info(f"🌐 主 API: {self.primary_base}")
+        logger.info(f"🔄 備用 API: {self.backup_base}")
         logger.info(f"⏱️  輪詢間隔: {poll_interval} 秒")
         logger.info("=" * 70)
         
