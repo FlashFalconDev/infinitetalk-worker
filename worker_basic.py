@@ -1,6 +1,6 @@
 """
-InfiniteTalk Worker - 修正版
-修正 GPU 資訊的 JSON 序列化問題
+InfiniteTalk Worker - 簡化版
+支援從 .env 讀取配置
 """
 import requests
 import json
@@ -12,8 +12,9 @@ import socket
 import threading
 from datetime import datetime
 
+# ✅ 載入 .env 檔案
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv()  # 自動讀取 .env
 
 from model_service import get_model_service
 
@@ -26,6 +27,7 @@ class InfiniteTalkWorker:
         self.base_url = os.getenv('INFINITETALK_API_BASE', 'https://host.flashfalcon.info')
         self.worker_token = os.getenv('INFINITETALK_WORKER_TOKEN')
         
+        # 檢查必要配置
         if not self.worker_token:
             logger.error("=" * 70)
             logger.error("❌ 缺少環境變數: INFINITETALK_WORKER_TOKEN")
@@ -34,18 +36,22 @@ class InfiniteTalkWorker:
             logger.error("1. 複製範例: cp .env.example .env")
             logger.error("2. 編輯檔案: nano .env")
             logger.error("3. 填入從 Admin 後台複製的 Token")
+            logger.error("")
+            logger.error("或者臨時測試:")
+            logger.error("export INFINITETALK_WORKER_TOKEN='your_token'")
+            logger.error("python worker.py")
             logger.error("=" * 70)
             raise ValueError("Missing INFINITETALK_WORKER_TOKEN")
         
         # API 端點
         self.heartbeat_api = f"{self.base_url}/ai/api/worker/heartbeat"
-        self.task_api = f"{self.base_url}/aigen/api/pending_task/"
-        self.result_api = f"{self.base_url}/aigen/api/task_result/"
+        self.task_api = f"{self.base_url}/ai/api/pending_task/"
+        self.result_api = f"{self.base_url}/ai/api/task_result/"
         self.upload_api = f"{self.base_url}/api/save_file/"
         
         # Worker 資訊
         self.worker_id = self._generate_worker_id()
-        self.worker_version = "7.2"
+        self.worker_version = "7.1"
         
         # 目錄設定
         self.temp_dir = "temp_downloads"
@@ -53,16 +59,12 @@ class InfiniteTalkWorker:
         os.makedirs(self.temp_dir, exist_ok=True)
         os.makedirs(self.output_dir, exist_ok=True)
         
-        # ✅ 檢查 GPU 監控能力
-        self.gpu_monitoring_available = self._check_gpu_monitoring()
-        
         # 初始化
         logger.info("=" * 70)
-        logger.info("🚀 初始化 InfiniteTalk Worker v7.2 (增強版)")
+        logger.info("🚀 初始化 InfiniteTalk Worker v7.1")
         logger.info(f"🆔 Worker ID: {self.worker_id}")
         logger.info(f"🔑 Token: {self.worker_token[:10]}...{self.worker_token[-10:]}")
         logger.info(f"🌐 API Base: {self.base_url}")
-        logger.info(f"📊 GPU 監控: {'✅ 已啟用' if self.gpu_monitoring_available else '⚠️  基本模式'}")
         logger.info("=" * 70)
         
         # 測試連線
@@ -89,23 +91,6 @@ class InfiniteTalkWorker:
         short_uuid = str(uuid.uuid4())[:8]
         return f"{hostname}-{short_uuid}"
     
-    def _check_gpu_monitoring(self):
-        """檢查是否可以使用詳細的 GPU 監控"""
-        try:
-            import pynvml
-            pynvml.nvmlInit()
-            device_count = pynvml.nvmlDeviceGetCount()
-            pynvml.nvmlShutdown()
-            logger.info(f"✅ GPU 監控已啟用 (偵測到 {device_count} 個 GPU)")
-            return True
-        except ImportError:
-            logger.warning("⚠️  未安裝 nvidia-ml-py3，使用基本 GPU 監控")
-            logger.info("   安裝方式: pip install nvidia-ml-py3")
-            return False
-        except Exception as e:
-            logger.warning(f"⚠️  無法初始化 GPU 監控: {e}")
-            return False
-    
     def _get_auth_headers(self):
         """獲取認證 Headers"""
         return {
@@ -114,13 +99,13 @@ class InfiniteTalkWorker:
         }
     
     def _get_system_info(self):
-        """✅ 修正：獲取系統資訊（確保所有值都可 JSON 序列化）"""
+        """獲取系統資訊"""
         info = {
             'hostname': socket.gethostname(),
             'version': self.worker_version
         }
         
-        # GPU 基本資訊
+        # GPU 資訊
         try:
             import torch
             if torch.cuda.is_available():
@@ -129,107 +114,27 @@ class InfiniteTalkWorker:
                     'name': torch.cuda.get_device_name(0),
                     'count': torch.cuda.device_count(),
                     'total_memory_gb': round(gpu_props.total_memory / 1024**3, 2),
-                    'cuda_version': str(torch.version.cuda),  # ✅ 轉為字串
-                    'pytorch_version': str(torch.__version__)  # ✅ 轉為字串
+                    'cuda_version': torch.version.cuda
                 }
-                
-                # ✅ 如果有詳細監控，加入驅動版本
-                if self.gpu_monitoring_available:
-                    try:
-                        import pynvml
-                        pynvml.nvmlInit()
-                        # ✅ 關鍵修正：bytes 轉 string
-                        driver_version = pynvml.nvmlSystemGetDriverVersion()
-                        if isinstance(driver_version, bytes):
-                            driver_version = driver_version.decode('utf-8')
-                        info['gpu_info']['driver_version'] = driver_version
-                        pynvml.nvmlShutdown()
-                    except Exception as e:
-                        logger.debug(f"無法獲取驅動版本: {e}")
-                
         except Exception as e:
             logger.warning(f"無法獲取 GPU 資訊: {e}")
         
         return info
     
     def _get_gpu_stats(self):
-        """✅ 修正：獲取詳細的 GPU 狀態（確保所有值都可 JSON 序列化）"""
-        stats = {}
-        
+        """獲取當前 GPU 狀態"""
         try:
             import torch
-            if not torch.cuda.is_available():
-                return stats
-            
-            # 基本記憶體資訊（PyTorch）
-            allocated = torch.cuda.memory_allocated(0) / 1024**3
-            reserved = torch.cuda.memory_reserved(0) / 1024**3
-            total = torch.cuda.get_device_properties(0).total_memory / 1024**3
-            
-            stats['gpu_memory_used'] = round(allocated, 2)
-            stats['gpu_memory_reserved'] = round(reserved, 2)
-            stats['gpu_memory_total'] = round(total, 2)
-            stats['gpu_memory_utilization'] = round((allocated / total) * 100, 2)
-            
-            # ✅ 詳細資訊（nvidia-ml-py3）
-            if self.gpu_monitoring_available:
-                try:
-                    import pynvml
-                    pynvml.nvmlInit()
-                    
-                    handle = pynvml.nvmlDeviceGetHandleByIndex(0)
-                    
-                    # GPU 使用率
-                    util = pynvml.nvmlDeviceGetUtilizationRates(handle)
-                    stats['gpu_utilization'] = int(util.gpu)  # ✅ 轉為 int
-                    stats['gpu_memory_controller_utilization'] = int(util.memory)
-                    
-                    # GPU 溫度
-                    temp = pynvml.nvmlDeviceGetTemperature(handle, pynvml.NVML_TEMPERATURE_GPU)
-                    stats['gpu_temperature'] = int(temp)  # ✅ 轉為 int
-                    
-                    # GPU 功率
-                    try:
-                        power = pynvml.nvmlDeviceGetPowerUsage(handle) / 1000.0
-                        power_limit = pynvml.nvmlDeviceGetPowerManagementLimit(handle) / 1000.0
-                        stats['gpu_power_usage'] = round(power, 2)
-                        stats['gpu_power_limit'] = round(power_limit, 2)
-                        stats['gpu_power_utilization'] = round((power / power_limit) * 100, 2)
-                    except:
-                        pass
-                    
-                    # GPU 時鐘頻率
-                    try:
-                        clock_graphics = pynvml.nvmlDeviceGetClockInfo(handle, pynvml.NVML_CLOCK_GRAPHICS)
-                        clock_memory = pynvml.nvmlDeviceGetClockInfo(handle, pynvml.NVML_CLOCK_MEM)
-                        stats['gpu_clock_graphics_mhz'] = int(clock_graphics)
-                        stats['gpu_clock_memory_mhz'] = int(clock_memory)
-                    except:
-                        pass
-                    
-                    # GPU 風扇轉速
-                    try:
-                        fan_speed = pynvml.nvmlDeviceGetFanSpeed(handle)
-                        stats['gpu_fan_speed'] = int(fan_speed)
-                    except:
-                        pass
-                    
-                    # GPU 進程資訊
-                    try:
-                        processes = pynvml.nvmlDeviceGetComputeRunningProcesses(handle)
-                        stats['gpu_process_count'] = len(processes)
-                    except:
-                        pass
-                    
-                    pynvml.nvmlShutdown()
-                    
-                except Exception as e:
-                    logger.debug(f"詳細 GPU 監控失敗: {e}")
-            
+            if torch.cuda.is_available():
+                allocated = torch.cuda.memory_allocated(0) / 1024**3
+                
+                return {
+                    'gpu_memory_used': round(allocated, 2)
+                }
         except Exception as e:
             logger.debug(f"獲取 GPU 狀態失敗: {e}")
         
-        return stats
+        return {}
     
     def _test_connection(self):
         """測試連線"""
@@ -244,9 +149,6 @@ class InfiniteTalkWorker:
                 **self._get_system_info()
             }
             
-            # ✅ 調試：顯示要發送的資料
-            logger.debug(f"發送資料: {json.dumps(data, indent=2)}")
-            
             response = requests.post(
                 self.heartbeat_api,
                 json=data,
@@ -255,32 +157,20 @@ class InfiniteTalkWorker:
             )
             
             if response.status_code == 200:
-                result = response.json()
-                if result.get('success'):
-                    logger.info("✅ 連線成功")
-                    if 'data' in result and 'worker_name' in result['data']:
-                        logger.info(f"   後端識別為: {result['data']['worker_name']}")
-                    return True
+                logger.info("✅ 連線成功")
+                return True
             elif response.status_code == 401:
                 logger.error("❌ Token 無效或已停用")
                 return False
             else:
                 logger.error(f"❌ 連線失敗: HTTP {response.status_code}")
-                logger.error(f"   回應: {response.text}")
                 return False
                 
         except requests.exceptions.ConnectionError:
             logger.error(f"❌ 無法連接到 {self.base_url}")
             return False
-        except json.JSONDecodeError as e:
-            logger.error(f"❌ JSON 序列化失敗: {e}")
-            import traceback
-            traceback.print_exc()
-            return False
         except Exception as e:
             logger.error(f"❌ 連線測試失敗: {e}")
-            import traceback
-            traceback.print_exc()
             return False
     
     def _send_heartbeat(self):
@@ -296,14 +186,6 @@ class InfiniteTalkWorker:
                 **self._get_gpu_stats()
             }
             
-            # 首次心跳顯示資料
-            if not hasattr(self, '_first_heartbeat_logged'):
-                logger.info("📊 首次心跳資料:")
-                for key, value in data.items():
-                    if key not in ['worker_id', 'status', 'timestamp']:
-                        logger.info(f"   {key}: {value}")
-                self._first_heartbeat_logged = True
-            
             response = requests.post(
                 self.heartbeat_api,
                 json=data,
@@ -313,15 +195,6 @@ class InfiniteTalkWorker:
             
             if response.status_code == 200:
                 logger.debug(f"💓 心跳發送成功")
-                
-                gpu_stats = self._get_gpu_stats()
-                if gpu_stats:
-                    logger.debug(
-                        f"   GPU: {gpu_stats.get('gpu_memory_used', 0):.1f}GB / "
-                        f"{gpu_stats.get('gpu_utilization', 0):.0f}% / "
-                        f"{gpu_stats.get('gpu_temperature', 0):.0f}°C"
-                    )
-                
                 return True
             elif response.status_code == 401:
                 logger.error(f"❌ Token 已失效")
@@ -381,7 +254,10 @@ class InfiniteTalkWorker:
             if response.status_code == 200:
                 result = response.json()
                 
-                if result is None or not isinstance(result, dict):
+                if result is None:
+                    return []
+                
+                if not isinstance(result, dict):
                     return []
                 
                 if not result.get("success"):

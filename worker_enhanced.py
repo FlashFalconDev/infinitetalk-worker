@@ -1,6 +1,6 @@
 """
-InfiniteTalk Worker - 修正版
-修正 GPU 資訊的 JSON 序列化問題
+InfiniteTalk Worker - 增強版
+支援完整的 GPU 監控資訊
 """
 import requests
 import json
@@ -45,7 +45,7 @@ class InfiniteTalkWorker:
         
         # Worker 資訊
         self.worker_id = self._generate_worker_id()
-        self.worker_version = "7.2"
+        self.worker_version = "7.2"  # 增強版本號
         
         # 目錄設定
         self.temp_dir = "temp_downloads"
@@ -114,7 +114,7 @@ class InfiniteTalkWorker:
         }
     
     def _get_system_info(self):
-        """✅ 修正：獲取系統資訊（確保所有值都可 JSON 序列化）"""
+        """獲取系統資訊（首次連線時發送）"""
         info = {
             'hostname': socket.gethostname(),
             'version': self.worker_version
@@ -129,8 +129,8 @@ class InfiniteTalkWorker:
                     'name': torch.cuda.get_device_name(0),
                     'count': torch.cuda.device_count(),
                     'total_memory_gb': round(gpu_props.total_memory / 1024**3, 2),
-                    'cuda_version': str(torch.version.cuda),  # ✅ 轉為字串
-                    'pytorch_version': str(torch.__version__)  # ✅ 轉為字串
+                    'cuda_version': torch.version.cuda,
+                    'pytorch_version': torch.__version__
                 }
                 
                 # ✅ 如果有詳細監控，加入驅動版本
@@ -138,14 +138,11 @@ class InfiniteTalkWorker:
                     try:
                         import pynvml
                         pynvml.nvmlInit()
-                        # ✅ 關鍵修正：bytes 轉 string
                         driver_version = pynvml.nvmlSystemGetDriverVersion()
-                        if isinstance(driver_version, bytes):
-                            driver_version = driver_version.decode('utf-8')
                         info['gpu_info']['driver_version'] = driver_version
                         pynvml.nvmlShutdown()
-                    except Exception as e:
-                        logger.debug(f"無法獲取驅動版本: {e}")
+                    except:
+                        pass
                 
         except Exception as e:
             logger.warning(f"無法獲取 GPU 資訊: {e}")
@@ -153,7 +150,7 @@ class InfiniteTalkWorker:
         return info
     
     def _get_gpu_stats(self):
-        """✅ 修正：獲取詳細的 GPU 狀態（確保所有值都可 JSON 序列化）"""
+        """✅ 增強版：獲取詳細的 GPU 狀態"""
         stats = {}
         
         try:
@@ -181,16 +178,16 @@ class InfiniteTalkWorker:
                     
                     # GPU 使用率
                     util = pynvml.nvmlDeviceGetUtilizationRates(handle)
-                    stats['gpu_utilization'] = int(util.gpu)  # ✅ 轉為 int
-                    stats['gpu_memory_controller_utilization'] = int(util.memory)
+                    stats['gpu_utilization'] = util.gpu
+                    stats['gpu_memory_controller_utilization'] = util.memory
                     
                     # GPU 溫度
                     temp = pynvml.nvmlDeviceGetTemperature(handle, pynvml.NVML_TEMPERATURE_GPU)
-                    stats['gpu_temperature'] = int(temp)  # ✅ 轉為 int
+                    stats['gpu_temperature'] = temp
                     
                     # GPU 功率
                     try:
-                        power = pynvml.nvmlDeviceGetPowerUsage(handle) / 1000.0
+                        power = pynvml.nvmlDeviceGetPowerUsage(handle) / 1000.0  # mW to W
                         power_limit = pynvml.nvmlDeviceGetPowerManagementLimit(handle) / 1000.0
                         stats['gpu_power_usage'] = round(power, 2)
                         stats['gpu_power_limit'] = round(power_limit, 2)
@@ -202,15 +199,15 @@ class InfiniteTalkWorker:
                     try:
                         clock_graphics = pynvml.nvmlDeviceGetClockInfo(handle, pynvml.NVML_CLOCK_GRAPHICS)
                         clock_memory = pynvml.nvmlDeviceGetClockInfo(handle, pynvml.NVML_CLOCK_MEM)
-                        stats['gpu_clock_graphics_mhz'] = int(clock_graphics)
-                        stats['gpu_clock_memory_mhz'] = int(clock_memory)
+                        stats['gpu_clock_graphics_mhz'] = clock_graphics
+                        stats['gpu_clock_memory_mhz'] = clock_memory
                     except:
                         pass
                     
                     # GPU 風扇轉速
                     try:
                         fan_speed = pynvml.nvmlDeviceGetFanSpeed(handle)
-                        stats['gpu_fan_speed'] = int(fan_speed)
+                        stats['gpu_fan_speed'] = fan_speed
                     except:
                         pass
                     
@@ -244,9 +241,6 @@ class InfiniteTalkWorker:
                 **self._get_system_info()
             }
             
-            # ✅ 調試：顯示要發送的資料
-            logger.debug(f"發送資料: {json.dumps(data, indent=2)}")
-            
             response = requests.post(
                 self.heartbeat_api,
                 json=data,
@@ -266,37 +260,30 @@ class InfiniteTalkWorker:
                 return False
             else:
                 logger.error(f"❌ 連線失敗: HTTP {response.status_code}")
-                logger.error(f"   回應: {response.text}")
                 return False
                 
         except requests.exceptions.ConnectionError:
             logger.error(f"❌ 無法連接到 {self.base_url}")
             return False
-        except json.JSONDecodeError as e:
-            logger.error(f"❌ JSON 序列化失敗: {e}")
-            import traceback
-            traceback.print_exc()
-            return False
         except Exception as e:
             logger.error(f"❌ 連線測試失敗: {e}")
-            import traceback
-            traceback.print_exc()
             return False
     
     def _send_heartbeat(self):
-        """發送心跳"""
+        """發送心跳（包含詳細 GPU 資訊）"""
         try:
             headers = self._get_auth_headers()
             
+            # ✅ 收集所有資訊
             data = {
                 'worker_id': self.worker_id,
                 'status': 'online',
                 'timestamp': datetime.now().isoformat(),
                 'version': self.worker_version,
-                **self._get_gpu_stats()
+                **self._get_gpu_stats()  # 包含所有 GPU 狀態
             }
             
-            # 首次心跳顯示資料
+            # 調試：顯示發送的資料（只在第一次）
             if not hasattr(self, '_first_heartbeat_logged'):
                 logger.info("📊 首次心跳資料:")
                 for key, value in data.items():
@@ -314,6 +301,7 @@ class InfiniteTalkWorker:
             if response.status_code == 200:
                 logger.debug(f"💓 心跳發送成功")
                 
+                # 顯示關鍵資訊
                 gpu_stats = self._get_gpu_stats()
                 if gpu_stats:
                     logger.debug(
