@@ -1,6 +1,7 @@
-# 環境變數
+# 環境變數（敏感資訊）
 .env
 .env.local
+.env.backup
 
 # 模型和權重
 weights/

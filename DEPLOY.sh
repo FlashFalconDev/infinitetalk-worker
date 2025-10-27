@@ -6,8 +6,8 @@ echo "===================================="
 echo ""
 
 # 檢查 Python 版本
-REQUIRED_PYTHON=$(cat PYTHON_VERSION.txt)
-CURRENT_PYTHON=$(python --version)
+REQUIRED_PYTHON=$(cat PYTHON_VERSION.txt 2>/dev/null || echo "Unknown")
+CURRENT_PYTHON=$(python --version 2>&1)
 echo "📌 Python 版本: $CURRENT_PYTHON"
 echo "   要求版本: $REQUIRED_PYTHON"
 echo ""
@@ -35,14 +35,14 @@ except Exception as e:
     sys.exit(1)
 "
 
-# 4. 環境變數設定
+# 4. 檢查環境變數
 echo "⚙️  [4/4] 檢查環境變數..."
 if [ ! -f .env ]; then
-    echo "⚠️  .env 不存在，請創建 .env 檔案"
+    echo "⚠️  .env 不存在，請先設定："
     echo ""
-    echo "範例內容:"
-    echo "INFINITETALK_API_BASE=https://host.flashfalcon.info"
-    echo "INFINITETALK_WORKER_TOKEN=your_token_here"
+    echo "   cp .env.example .env"
+    echo "   nano .env  # 編輯填入正確的 API_BASE 和 TOKEN"
+    echo ""
     exit 1
 fi
 
