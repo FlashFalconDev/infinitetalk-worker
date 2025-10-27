@@ -1,0 +1,7 @@
+{
+    "prompt": "\u8aaa\u8a71",
+    "cond_video": "temp_downloads/040a354e-eb83-4d65-bb89-18e718451432_image.jpg",
+    "cond_audio": {
+        "person1": "temp_downloads/040a354e-eb83-4d65-bb89-18e718451432_audio.wav"
+    }
+}

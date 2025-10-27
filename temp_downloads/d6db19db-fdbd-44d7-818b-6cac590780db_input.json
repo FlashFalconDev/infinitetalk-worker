@@ -1,0 +1,7 @@
+{
+    "prompt": "\u6050\u61fc",
+    "cond_video": "temp_downloads/d6db19db-fdbd-44d7-818b-6cac590780db_image.jpg",
+    "cond_audio": {
+        "person1": "temp_downloads/d6db19db-fdbd-44d7-818b-6cac590780db_audio.wav"
+    }
+}

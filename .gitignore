@@ -1,38 +1,18 @@
-# 模型权重（太大，不要上传）
+# 大檔案 - 不要上傳
 weights/
-*.safetensors
-*.pt
 *.pth
+*.safetensors
 *.ckpt
+*.bin
 
-# 临时文件
-temp_*/
-outputs/
-*.pyc
-__pycache__/
-.DS_Store
-
-# 环境配置
-.env
+# 臨時檔案
+temp_gen_*/
+temp_uploads/
 *.log
+*.mp4
+__pycache__/
+*.pyc
 
-# 下载的文件
-temp_downloads/
-
-# 備份檔案
-*.backup
-*_backup_*.py
-model_service_with_realesrgan_backup.py
-fix_realesrgan_*.sh
-
-# 備份檔案
-*.backup
-*_backup_*.py
-model_service_with_realesrgan_backup.py
-fix_realesrgan_*.sh
-
-# 備份檔案
-*.backup
-*_backup_*.py
-model_service_with_realesrgan_backup.py
-fix_realesrgan_*.sh
+# 測試檔案
+test_*.py
+test_*.mp4

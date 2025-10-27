@@ -1,387 +1,300 @@
-<div align="center">
+# InfiniteTalk Worker v7.2
 
-<p align="center">
-  <img src="assets/logo2.jpg" alt="InfinteTalk" width="440"/>
-</p>
+🚀 高性能的 InfiniteTalk 視頻生成 Worker，支援完整 GPU 監控和 Token 認證。
 
-<h1>InfiniteTalk: Audio-driven Video Generation for Sparse-Frame Video Dubbing</h1>
+## ✨ 主要功能
 
+- 🔐 **Token 認證**: 安全的 Bearer Token 認證機制
+- 📊 **GPU 監控**: 完整的 GPU 性能監控
+  - 使用率、溫度、功率
+  - 時鐘頻率、風扇轉速
+  - 記憶體使用詳情
+- 💓 **心跳系統**: 自動保持在線狀態（每 60 秒）
+- ⚙️ **環境配置**: 支援 .env 檔案配置
+- 🎨 **品質控制**: 支援多種品質預設（fast/balanced/high/ultra）
 
-[Shaoshu Yang*](https://scholar.google.com/citations?user=JrdZbTsAAAAJ&hl=en) · [Zhe Kong*](https://scholar.google.com/citations?user=4X3yLwsAAAAJ&hl=zh-CN) · [Feng Gao*](https://scholar.google.com/citations?user=lFkCeoYAAAAJ) · [Meng Cheng*]() · [Xiangyu Liu*]() · [Yong Zhang](https://yzhang2016.github.io/)<sup>&#9993;</sup> · [Zhuoliang Kang](https://scholar.google.com/citations?user=W1ZXjMkAAAAJ&hl=en)
+## 🚀 快速開始
 
-[Wenhan Luo](https://whluo.github.io/) · [Xunliang Cai](https://openreview.net/profile?id=~Xunliang_Cai1) · [Ran He](https://scholar.google.com/citations?user=ayrg9AUAAAAJ&hl=en)· [Xiaoming Wei](https://scholar.google.com/citations?user=JXV5yrZxj5MC&hl=zh-CN) 
+### 1. 準備環境
+```bash
+# 克隆倉庫
+git clone https://github.com/FlashFalconDev/infinitetalk-worker.git
+cd infinitetalk-worker
 
-<sup>*</sup>Equal Contribution
-<sup>&#9993;</sup>Corresponding Authors
-
-<a href='https://meigen-ai.github.io/InfiniteTalk/'><img src='https://img.shields.io/badge/Project-Page-green'></a>
-<a href='https://arxiv.org/abs/2508.14033'><img src='https://img.shields.io/badge/Technique-Report-red'></a>
-<a href='https://huggingface.co/MeiGen-AI/InfiniteTalk'><img src='https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-blue'></a>
-</div>
-
-> **TL; DR:**  InfiniteTalk is an unlimited-length talking video generation​​ model that supports both audio-driven video-to-video and image-to-video generation
-
-<p align="center">
-  <img src="assets/pipeline.png">
-</p>
-
-
-
-
-
-
-
-## 🔥 Latest News
-
-* August 19, 2025: We release the [Technique-Report](https://arxiv.org/abs/2508.14033) , weights, and code of **InfiniteTalk**. The Gradio and the [ComfyUI](https://github.com/MeiGen-AI/InfiniteTalk/tree/comfyui) branch have been released. 
-* August 19, 2025: We release the [project page](https://meigen-ai.github.io/InfiniteTalk/) of **InfiniteTalk** 
-
-
-## ✨ Key Features
-We propose **InfiniteTalk**​​, a novel sparse-frame video dubbing framework. Given an input video and audio track, InfiniteTalk synthesizes a new video with ​​accurate lip synchronization​​ while ​​simultaneously aligning head movements, body posture, and facial expressions​​ with the audio. Unlike traditional dubbing methods that focus solely on lips, InfiniteTalk enables ​​infinite-length video generation​​ with accurate lip synchronization and consistent identity preservation. Beside, InfiniteTalk can also be used as an image-audio-to-video model with an image and an audio as input. 
-- 💬 ​​Sparse-frame Video Dubbing​​ – Synchronizes not only lips, but aslo head, body, and expressions
-- ⏱️ ​​Infinite-Length Generation​​ – Supports unlimited video duration
-- ✨ ​​Stability​​ – Reduces hand/body distortions compared to MultiTalk
-- 🚀 ​​Lip Accuracy​​ – Achieves superior lip synchronization to MultiTalk
-
-
-
-## 🌐 Community  Works
-- [Wan2GP](https://github.com/deepbeepmeep/Wan2GP/): Thanks [deepbeepmeep](https://github.com/deepbeepmeep) for integrating InfiniteTalk in Wan2GP that is optimized for low VRAM and offers many video edtiting option and other models (MMaudio support, Qwen Image Edit, ...). 
-- [ComfyUI](https://github.com/kijai/ComfyUI-WanVideoWrapper): Thanks for the comfyui support of [kijai](https://github.com/kijai). 
-
-
-
-## 📑 Todo List
-
-- [x] Release the technical report
-- [x] Inference
-- [x] Checkpoints
-- [x] Multi-GPU Inference
-- [ ] Inference acceleration
-  - [x] TeaCache
-  - [x] int8 quantization
-  - [ ] LCM distillation
-  - [ ] Sparse Attention
-- [x] Run with very low VRAM
-- [x] Gradio demo
-- [x] ComfyUI
-
-## Video Demos
-
-
-### Video-to-video (HQ videos can be found on [Google Drive](https://drive.google.com/drive/folders/1BNrH6GJZ2Wt5gBuNLmfXZ6kpqb9xFPjU?usp=sharing) )
-
-
-<table border="0" style="width: 100%; text-align: left; margin-top: 20px;">
-  <tr>
-      <td>
-          <video src="https://github.com/user-attachments/assets/04f15986-8de7-4bb4-8cde-7f7f38244f9f" width="320" controls loop></video>
-      </td>
-       <td>
-          <video src="https://github.com/user-attachments/assets/1500f72e-a096-42e5-8b44-f887fa8ae7cb" width="320" controls loop></video>
-     </td>
-     <td>
-          <video src="https://github.com/user-attachments/assets/28f484c2-87dc-4828-a9e7-cb963da92d14" width="320" controls loop></video>
-     </td>
-     <td>
-          <video src="https://github.com/user-attachments/assets/665fabe4-3e24-4008-a0a2-a66e2e57c38b" width="320" controls loop></video>
-     </td>
-  </tr>
-</table>
-
-### Image-to-video
-
-<table border="0" style="width: 100%; text-align: left; margin-top: 20px;">
-  <tr>
-      <td>
-          <video src="https://github.com/user-attachments/assets/7e4a4dad-9666-4896-8684-2acb36aead59" width="320" controls loop></video>
-      </td>
-      <td>
-          <video src="https://github.com/user-attachments/assets/bd6da665-f34d-4634-ae94-b4978f92ad3a" width="320" controls loop></video>
-      </td>
-       <td>
-          <video src="https://github.com/user-attachments/assets/510e2648-82db-4648-aaf3-6542303dbe22" width="320" controls loop></video>
-     </td>
-     <td>
-          <video src="https://github.com/user-attachments/assets/27bb087b-866a-4300-8a03-3bbb4ce3ddf9" width="320" controls loop></video>
-     </td>
-     
-  </tr>
-  <tr>
-      <td>
-          <video src="https://github.com/user-attachments/assets/3263c5e1-9f98-4b9b-8688-b3e497460a76" width="320" controls loop></video>
-      </td>
-      <td>
-          <video src="https://github.com/user-attachments/assets/5ff3607f-90ec-4eee-b964-9d5ee3028005" width="320" controls loop></video>
-      </td>
-       <td>
-          <video src="https://github.com/user-attachments/assets/e504417b-c8c7-4cf0-9afa-da0f3cbf3726" width="320" controls loop></video>
-     </td>
-     <td>
-          <video src="https://github.com/user-attachments/assets/56aac91e-c51f-4d44-b80d-7d115e94ead7" width="320" controls loop></video>
-     </td>
-     
-  </tr>
-</table>
-
-## Quick Start
-
-### 🛠️Installation
-
-#### 1. Create a conda environment and install pytorch, xformers
-```
-conda create -n multitalk python=3.10
-conda activate multitalk
-pip install torch==2.4.1 torchvision==0.19.1 torchaudio==2.4.1 --index-url https://download.pytorch.org/whl/cu121
-pip install -U xformers==0.0.28 --index-url https://download.pytorch.org/whl/cu121
-```
-#### 2. Flash-attn installation:
-```
-pip install misaki[en]
-pip install ninja 
-pip install psutil 
-pip install packaging
-pip install wheel
-pip install flash_attn==2.7.4.post1
-```
-
-#### 3. Other dependencies
-```
+# 安裝依賴
 pip install -r requirements.txt
-conda install -c conda-forge librosa
-```
 
-#### 4. FFmeg installation
-```
-conda install -c conda-forge ffmpeg
-```
-or
-```
-sudo yum install ffmpeg ffmpeg-devel
-```
+# 可選：安裝 GPU 監控
+pip install nvidia-ml-py3
+2. 配置 Worker
+bash# 複製配置範例
+cp .env.example .env
 
-### 🧱Model Preparation
+# 編輯配置，填入 Token
+nano .env
+在 .env 中設定：
+envINFINITETALK_API_BASE=https://host.flashfalcon.info
+INFINITETALK_WORKER_TOKEN=your_token_from_admin
+3. 啟動 Worker
+方式 1: 使用腳本（推薦）
+bash./start_worker.sh
+方式 2: 手動啟動
+bashnohup python worker.py > worker.log 2>&1 &
+方式 3: 前台運行（測試）
+bashpython worker.py
+📊 管理 Worker
+查看狀態
+bash./status_worker.sh
+查看日誌
+bashtail -f worker.log
+停止 Worker
+bash./stop_worker.sh
+重啟 Worker
+bash./stop_worker.sh
+./start_worker.sh
+🔧 配置說明
+環境變數
+變數必須說明預設值INFINITETALK_WORKER_TOKEN✅Worker Token（從 Admin 後台獲取）-INFINITETALK_API_BASE❌API Base URLhttps://host.flashfalcon.infoWORKER_ID❌Worker 識別碼自動生成LOG_LEVEL❌日誌級別INFO
+獲取 Token
 
-#### 1. Model Download
+登入 Admin 後台：https://host.flashfalcon.info/admin/
+進入「Worker 主機」管理
+點擊「新增 Worker」
+填寫資訊並保存
+複製顯示的 Token
 
-| Models        |                       Download Link                                           |    Notes                      |
-| --------------|-------------------------------------------------------------------------------|-------------------------------|
-| Wan2.1-I2V-14B-480P  |      🤗 [Huggingface](https://huggingface.co/Wan-AI/Wan2.1-I2V-14B-480P)       | Base model
-| chinese-wav2vec2-base |      🤗 [Huggingface](https://huggingface.co/TencentGameMate/chinese-wav2vec2-base)          | Audio encoder
-| MeiGen-InfiniteTalk      |      🤗 [Huggingface](https://huggingface.co/MeiGen-AI/InfiniteTalk)              | Our audio condition weights
+📦 系統需求
 
-Download models using huggingface-cli:
-``` sh
-huggingface-cli download Wan-AI/Wan2.1-I2V-14B-480P --local-dir ./weights/Wan2.1-I2V-14B-480P
-huggingface-cli download TencentGameMate/chinese-wav2vec2-base --local-dir ./weights/chinese-wav2vec2-base
-huggingface-cli download TencentGameMate/chinese-wav2vec2-base model.safetensors --revision refs/pr/1 --local-dir ./weights/chinese-wav2vec2-base
-huggingface-cli download MeiGen-AI/InfiniteTalk --local-dir ./weights/InfiniteTalk
+Python: 3.10+
+GPU: NVIDIA GPU with CUDA 11.8+
+VRAM: 建議 24GB+ （根據品質設定）
+儲存: 10GB+ 可用空間
+系統: Ubuntu 20.04+ / CentOS 7+
 
-```
+🛠️ 依賴套件
+核心依賴：
+torch>=2.0.0
+diffusers>=0.25.0
+transformers>=4.36.0
+accelerate>=0.25.0
+xformers>=0.0.23
+requests>=2.31.0
+python-dotenv>=1.0.0
+可選依賴：
+nvidia-ml-py3>=7.352.0  # GPU 監控
+完整列表請見 requirements.txt
+🐛 故障排除
+Token 無效
+bash# 檢查 .env 配置
+cat .env | grep INFINITETALK_WORKER_TOKEN
 
-### 🔑 Quick Inference
+# 確認 Token 正確且未被停用
+GPU 監控不可用
+bash# 安裝 nvidia-ml-py3
+pip install nvidia-ml-py3
 
-Our model is compatible with both 480P and 720P resolutions. 
-> Some tips
-> - Lip synchronization accuracy:​​ Audio CFG works optimally between 3–5. Increase the audio CFG value for better synchronization.
-> - FusionX： While it enables faster inference and higher quality, FusionX LoRA exacerbates color shift over 1 minute and reduces ID preservation in videos.
-> - V2V generation: Enables unlimited length generation. The model mimics the original video's camera movement, though not identically. Using SDEdit improves camera movement accuracy significantly but introduces color shift and is best suited for short clips. Improvements for long video camera control are planned.
-> - I2V generation: Generates good results from a single image for up to 1 minute. Beyond 1 minute, color shifts become more pronounced. One trick for the high-quailty generation beyond 1 min is to copy the image to a video by translating or zooming in the image.  Here is a script to [convert image to video](https://github.com/MeiGen-AI/InfiniteTalk/blob/main/tools/convert_img_to_video.py).  
-> - Quantization model: If your inference process is killed due to insufficient memory, we suggest using the quantization model, which can help **reduce memory usage**.
+# 測試 GPU
+python -c "import pynvml; pynvml.nvmlInit(); print('GPU OK')"
+Worker 無法連線
+bash# 檢查網路
+ping host.flashfalcon.info
 
-#### Usage of InfiniteTalk
-```
---mode streaming: long video generation.
---mode clip: generate short video with one chunk. 
---use_teacache: run with TeaCache.
---size infinitetalk-480: generate 480P video.
---size infinitetalk-720: generate 720P video.
---use_apg: run with APG.
---teacache_thresh: A coefficient used for TeaCache acceleration
-—-sample_text_guide_scale： When not using LoRA, the optimal value is 5. After applying LoRA, the recommended value is 1.
-—-sample_audio_guide_scale： When not using LoRA, the optimal value is 4. After applying LoRA, the recommended value is 2.
-—-sample_audio_guide_scale： When not using LoRA, the optimal value is 4. After applying LoRA, the recommended value is 2.
---max_frame_num: The max frame length of the generated video, the default is 40 seconds(1000 frames).
-```
+# 檢查 Token
+curl -H "Authorization: Bearer YOUR_TOKEN" \
+  https://host.flashfalcon.info/ai/api/worker/heartbeat
+查看詳細日誌
+bash# 實時日誌
+tail -f worker.log
 
-#### 1. Inference
+# 最近 100 行
+tail -100 worker.log
 
-##### 1) Run with single GPU
+# 搜尋錯誤
+grep ERROR worker.log
+常見錯誤
+錯誤訊息原因解決方法Invalid or inactive tokenToken 無效或已停用檢查 Admin 後台，重新生成 TokenWorker does not support modelWorker 未配置此模型在 Admin 後台添加支援的模型CUDA out of memoryGPU 記憶體不足降低品質設定或使用更大的 GPUConnection refusedAPI 無法連接檢查網路和 API Base URL
+📊 性能監控
+GPU 狀態
+bash# 系統層級
+nvidia-smi
 
+# Worker 內部（顯示詳細資訊）
+./status_worker.sh
+任務統計
+在 Admin 後台查看：
 
-```
-python generate_infinitetalk.py \
-    --ckpt_dir weights/Wan2.1-I2V-14B-480P \
-    --wav2vec_dir 'weights/chinese-wav2vec2-base' \
-    --infinitetalk_dir weights/InfiniteTalk/single/infinitetalk.safetensors \
-    --input_json examples/single_example_image.json \
-    --size infinitetalk-480 \
-    --sample_steps 40 \
-    --mode streaming \
-    --motion_frame 9 \
-    --save_file infinitetalk_res
+總任務數
+完成任務數
+失敗任務數
+成功率
+平均處理時間
 
-```
+效能指標
+Worker 會自動收集並回報：
 
-##### 2) Run with 720P
+GPU 使用率
+GPU 溫度
+GPU 功率使用
+GPU 記憶體使用
+時鐘頻率
+風扇轉速
 
-If you want run with 720P, set `--size infinitetalk-720`:
+🔄 更新
+更新 Worker
+bash# 1. 停止 Worker
+./stop_worker.sh
 
-```
-python generate_infinitetalk.py \
-    --ckpt_dir weights/Wan2.1-I2V-14B-480P \
-    --wav2vec_dir 'weights/chinese-wav2vec2-base' \
-    --infinitetalk_dir weights/InfiniteTalk/single/infinitetalk.safetensors \
-    --input_json examples/single_example_image.json \
-    --size infinitetalk-720 \
-    --sample_steps 40 \
-    --mode streaming \
-    --motion_frame 9 \
-    --save_file infinitetalk_res_720p
+# 2. 備份配置
+cp .env .env.backup
 
-```
+# 3. 拉取最新代碼
+git pull origin main
 
-##### 3) Run with very low VRAM
+# 4. 更新依賴
+pip install -r requirements.txt --upgrade
 
-If you want run with very low VRAM, set `--num_persistent_param_in_dit 0`:
+# 5. 恢復配置
+cp .env.backup .env
 
+# 6. 重啟
+./start_worker.sh
+檢查版本
+bash# 查看當前版本
+git describe --tags
 
-```
-python generate_infinitetalk.py \
-    --ckpt_dir weights/Wan2.1-I2V-14B-480P \
-    --wav2vec_dir 'weights/chinese-wav2vec2-base' \
-    --infinitetalk_dir weights/InfiniteTalk/single/infinitetalk.safetensors \
-    --input_json examples/single_example_image.json \
-    --size infinitetalk-480 \
-    --sample_steps 40 \
-    --num_persistent_param_in_dit 0 \
-    --mode streaming \
-    --motion_frame 9 \
-    --save_file infinitetalk_res_lowvram
-```
+# 查看 Worker 版本
+grep "worker_version" worker.py
+🔒 安全建議
+保護 Token
 
-##### 4) Multi-GPU inference
+不要將 .env 提交到 Git
 
-```
-GPU_NUM=8
-torchrun --nproc_per_node=$GPU_NUM --standalone generate_infinitetalk.py \
-    --ckpt_dir weights/Wan2.1-I2V-14B-480P \
-    --wav2vec_dir 'weights/chinese-wav2vec2-base' \
-    --infinitetalk_dir weights/InfiniteTalk/single/infinitetalk.safetensors \
-    --dit_fsdp --t5_fsdp \
-    --ulysses_size=$GPU_NUM \
-    --input_json examples/single_example_image.json \
-    --size infinitetalk-480 \
-    --sample_steps 40 \
-    --mode streaming \
-    --motion_frame 9 \
-    --save_file infinitetalk_res_multigpu
-```
+bash   echo ".env" >> .gitignore
 
-##### 5) Multi-Person animation
+定期更換 Token
 
-```
-python generate_infinitetalk.py \
-    --ckpt_dir weights/Wan2.1-I2V-14B-480P \
-    --wav2vec_dir 'weights/chinese-wav2vec2-base' \
-    --infinitetalk_dir weights/InfiniteTalk/multi/infinitetalk.safetensors \
-    --input_json examples/multi_example_image.json \
-    --size infinitetalk-480 \
-    --sample_steps 40 \
-    --num_persistent_param_in_dit 0 \
-    --mode streaming \
-    --motion_frame 9 \
-    --save_file infinitetalk_res_multiperson
-```
-
-
-#### 2. Run with FusioniX or Lightx2v(Require only 4~8 steps)
-
-[FusioniX](https://huggingface.co/vrgamedevgirl84/Wan14BT2VFusioniX/blob/main/FusionX_LoRa/Wan2.1_I2V_14B_FusionX_LoRA.safetensors) require 8 steps and [lightx2v](https://huggingface.co/Kijai/WanVideo_comfy/blob/main/Wan21_T2V_14B_lightx2v_cfg_step_distill_lora_rank32.safetensors) requires only 4 steps.
-
-```
-python generate_infinitetalk.py \
-    --ckpt_dir weights/Wan2.1-I2V-14B-480P \
-    --wav2vec_dir 'weights/chinese-wav2vec2-base' \
-    --infinitetalk_dir weights/InfiniteTalk/single/infinitetalk.safetensors \
-    --lora_dir weights/Wan2.1_I2V_14B_FusionX_LoRA.safetensors \
-    --input_json examples/single_example_image.json \
-    --lora_scale 1.0 \
-    --size infinitetalk-480 \
-    --sample_text_guide_scale 1.0 \
-    --sample_audio_guide_scale 2.0 \
-    --sample_steps 8 \
-    --mode streaming \
-    --motion_frame 9 \
-    --sample_shift 2 \
-    --num_persistent_param_in_dit 0 \
-    --save_file infinitetalk_res_lora
-```
+建議每 3 個月更換一次
+在 Admin 後台重新生成
+更新 .env 並重啟 Worker
 
 
+限制檔案權限
 
-#### 3. Run with the quantization model (Only support run with single gpu)
+bash   chmod 600 .env
+防火牆設定
+bash# 只允許必要的出站連線
+sudo ufw allow out 443/tcp  # HTTPS
+sudo ufw allow out 80/tcp   # HTTP (可選)
+日誌管理
+bash# 定期清理日誌
+find . -name "worker.log" -mtime +7 -delete
 
-```
-python generate_infinitetalk.py \
-    --ckpt_dir weights/Wan2.1-I2V-14B-480P \
-    --wav2vec_dir 'weights/chinese-wav2vec2-base' \
-    --infinitetalk_dir weights/InfiniteTalk/single/infinitetalk.safetensors \
-    --input_json examples/single_example_image.json \
-    --size infinitetalk-480 \
-    --sample_steps 40 \
-    --mode streaming \
-    --quant fp8 \
-    --quant_dir weights/InfiniteTalk/quant_models/infinitetalk_single_fp8.safetensors \
-    --motion_frame 9 \
-    --num_persistent_param_in_dit 0 \
-    --save_file infinitetalk_res_quant
-```
+# 或使用 logrotate
+sudo nano /etc/logrotate.d/infinitetalk-worker
+🏗️ 架構說明
+工作流程
+Worker 啟動
+    ↓
+註冊/驗證 Token
+    ↓
+載入模型（只執行一次）
+    ↓
+啟動心跳線程（每 60 秒）
+    ↓
+輪詢任務（每 30 秒）
+    ↓
+處理任務
+    ├─ 下載圖片和音頻
+    ├─ 生成影片
+    ├─ 上傳結果
+    └─ 回報完成
+    ↓
+清理臨時檔案
+    ↓
+繼續輪詢
+目錄結構
+infinitetalk-worker/
+├── worker.py              # 主程序
+├── model_service.py       # 模型服務
+├── start_worker.sh        # 啟動腳本
+├── stop_worker.sh         # 停止腳本
+├── status_worker.sh       # 狀態腳本
+├── check_env.sh           # 環境檢查
+├── .env                   # 配置（不要提交）
+├── .env.example           # 配置範例
+├── requirements.txt       # 依賴列表
+├── README.md              # 本文件
+├── CHANGELOG.md           # 更新日誌
+├── temp_downloads/        # 臨時下載目錄
+├── outputs/               # 輸出目錄
+└── worker.log             # 日誌檔案
+📝 開發指南
+本地測試
+bash# 1. 設定測試 Token
+export INFINITETALK_WORKER_TOKEN=test_token
+
+# 2. 前台運行（方便調試）
+python worker.py
+
+# 3. 查看日誌
+tail -f worker.log
+修改配置
+編輯 worker.py 中的配置：
+python# 輪詢間隔（秒）
+def run(self, poll_interval=30):
+
+# 心跳間隔（秒）
+time.sleep(60)
+自訂品質預設
+在後端 Admin 配置不同的品質參數。
+📝 版本歷史
+v7.2 (2025-10-10)
+
+✅ Token 認證機制
+✅ 完整 GPU 監控（nvidia-ml-py3）
+✅ 心跳系統（每 60 秒）
+✅ 部署腳本（start/stop/status）
+✅ 環境變數配置（.env）
+✅ 錯誤修正（JSON 序列化）
+
+v7.1 (2025-10-09)
+
+✅ 品質參數支援（fast/balanced/high/ultra）
+✅ 參數字典覆蓋功能
+✅ .gitignore 清理
+
+v7.0 (2025-10-08)
+
+✅ 初始版本
+✅ InfiniteTalk 模型整合
+✅ LoRA 加速支援
+✅ 基本任務處理流程
+
+詳細更新日誌請見 CHANGELOG.md
+🤝 貢獻
+歡迎提交 Issue 和 Pull Request！
+貢獻指南
+
+Fork 本倉庫
+創建 feature 分支：git checkout -b feature/amazing-feature
+提交變更：git commit -m 'Add amazing feature'
+推送分支：git push origin feature/amazing-feature
+開啟 Pull Request
+
+📄 授權
+Apache-2.0 License
+📞 支援
+
+GitHub Issues: https://github.com/FlashFalconDev/infinitetalk-worker/issues
+Email: support@flashfalcon.info
+文檔: https://github.com/FlashFalconDev/infinitetalk-worker/wiki
+
+🙏 致謝
+
+InfiniteTalk 模型開發團隊
+Diffusers 社群
+所有貢獻者
 
 
-#### 4. Run with Gradio
-
-
-
-```
-python app.py \
-    --ckpt_dir weights/Wan2.1-I2V-14B-480P \
-    --wav2vec_dir 'weights/chinese-wav2vec2-base' \
-    --infinitetalk_dir weights/InfiniteTalk/single/infinitetalk.safetensors \
-    --num_persistent_param_in_dit 0 \
-    --motion_frame 9 
-```
-or
-```
-python app.py \
-    --ckpt_dir weights/Wan2.1-I2V-14B-480P \
-    --wav2vec_dir 'weights/chinese-wav2vec2-base' \
-    --infinitetalk_dir weights/InfiniteTalk/multi/infinitetalk.safetensors \
-    --num_persistent_param_in_dit 0 \
-    --motion_frame 9 
-```
-
-
-## 📚 Citation
-
-If you find our work useful in your research, please consider citing:
-
-```
-@misc{yang2025infinitetalkaudiodrivenvideogeneration,
-      title={InfiniteTalk: Audio-driven Video Generation for Sparse-Frame Video Dubbing}, 
-      author={Shaoshu Yang and Zhe Kong and Feng Gao and Meng Cheng and Xiangyu Liu and Yong Zhang and Zhuoliang Kang and Wenhan Luo and Xunliang Cai and Ran He and Xiaoming Wei},
-      year={2025},
-      eprint={2508.14033},
-      archivePrefix={arXiv},
-      primaryClass={cs.CV},
-      url={https://arxiv.org/abs/2508.14033}, 
-}
-```
-
-## 📜 License
-The models in this repository are licensed under the Apache 2.0 License. We claim no rights over the your generated contents, 
-granting you the freedom to use them while ensuring that your usage complies with the provisions of this license. 
-You are fully accountable for your use of the models, which must not involve sharing any content that violates applicable laws, 
-causes harm to individuals or groups, disseminates personal information intended for harm, spreads misinformation, or targets vulnerable populations. 
-
+🎉 享受使用 InfiniteTalk Worker！
+Made with ❤️ by FlashFalcon Team
