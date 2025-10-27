@@ -1,4 +1,8 @@
-# 大檔案 - 不要上傳
+# 環境變數
+.env
+.env.local
+
+# 模型和權重
 weights/
 *.pth
 *.safetensors
@@ -13,6 +17,11 @@ temp_uploads/
 __pycache__/
 *.pyc
 
-# 測試檔案
-test_*.py
-test_*.mp4
+# Python
+*.egg-info/
+dist/
+build/
+
+# 系統
+.DS_Store
+Thumbs.db
