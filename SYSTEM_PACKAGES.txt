@@ -1,3 +1,0 @@
-ffmpeg/noble,now 7:6.1.1-3ubuntu5 amd64 [installed]
-libsndfile1/noble-updates,noble-security,now 1.2.2-1ubuntu5.24.04.1 amd64 [installed,automatic]
-libsoxr0/noble,now 0.1.3-4build3 amd64 [installed,automatic]

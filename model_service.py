@@ -162,14 +162,17 @@ class InfiniteTalkModelService:
             cfg = WAN_CONFIGS['infinitetalk-14B']
 
             # 確保 LoRA 檔案存在（必須使用）
-            # LoRA 下載來源: https://huggingface.co/vrgamedevgirl84/Wan14BT2VFusioniX
+            # LoRA 下載來源: https://huggingface.co/vrgamedevgirl84/Wan14BT2VFusioniX/tree/main/FusionX_LoRa
             # 檔案: Wan2.1_I2V_14B_FusionX_LoRA.safetensors (353.9 MB)
             if not os.path.exists(self.lora_dir):
                 raise FileNotFoundError(
                     f"❌ LoRA 檔案不存在: {self.lora_dir}\n"
                     f"請先下載 LoRA 檔案到 weights/ 目錄\n"
-                    f"下載來源: https://huggingface.co/vrgamedevgirl84/Wan14BT2VFusioniX\n"
-                    f"檔案名稱: Wan2.1_I2V_14B_FusionX_LoRA.safetensors (353.9 MB)"
+                    f"下載指令:\n"
+                    f"huggingface-cli download vrgamedevgirl84/Wan14BT2VFusioniX \\\n"
+                    f"  FusionX_LoRa/Wan2.1_I2V_14B_FusionX_LoRA.safetensors \\\n"
+                    f"  --local-dir /workspace/weights\n"
+                    f"然後移動到: mv /workspace/weights/FusionX_LoRa/Wan2.1_I2V_14B_FusionX_LoRA.safetensors /workspace/weights/"
                 )
 
             self.wan_i2v = wan.InfiniteTalkPipeline(
