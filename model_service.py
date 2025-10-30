@@ -99,10 +99,12 @@ class InfiniteTalkModelService:
         logger.info("=" * 80)
         logger.info(f"🎨 LoRA 配置:")
         logger.info(f"   路徑: {lora_dir}")
-        logger.info(f"   狀態: {'✅ 存在' if lora_exists else '❌ 不存在'}")
         if lora_exists:
             size_mb = os.path.getsize(lora_dir) / (1024*1024)
+            logger.info(f"   狀態: ✅ 已載入")
             logger.info(f"   大小: {size_mb:.1f} MB")
+        else:
+            logger.info(f"   狀態: ⚪ 未使用（選用功能，不影響基礎生成）")
         logger.info("=" * 80)
         
         logger.info("📊 品質方案 (6 檔精選 - 最終優化版 v7.1)")
@@ -141,8 +143,10 @@ class InfiniteTalkModelService:
             self.wav2vec_feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(
                 self.wav2vec_dir
             )
+            # Force eager attention to support output_attentions=True
             self.audio_encoder = Wav2Vec2Model.from_pretrained(
-                self.wav2vec_dir
+                self.wav2vec_dir,
+                attn_implementation='eager'
             ).to(self.device)
             logger.info("✅ wav2vec2 完成")
             
@@ -156,7 +160,18 @@ class InfiniteTalkModelService:
             logger.info(f"   VRAM 管理: 啟用 (num_persistent=0)")
             
             cfg = WAN_CONFIGS['infinitetalk-14B']
-            
+
+            # 確保 LoRA 檔案存在（必須使用）
+            # LoRA 下載來源: https://huggingface.co/vrgamedevgirl84/Wan14BT2VFusioniX
+            # 檔案: Wan2.1_I2V_14B_FusionX_LoRA.safetensors (353.9 MB)
+            if not os.path.exists(self.lora_dir):
+                raise FileNotFoundError(
+                    f"❌ LoRA 檔案不存在: {self.lora_dir}\n"
+                    f"請先下載 LoRA 檔案到 weights/ 目錄\n"
+                    f"下載來源: https://huggingface.co/vrgamedevgirl84/Wan14BT2VFusioniX\n"
+                    f"檔案名稱: Wan2.1_I2V_14B_FusionX_LoRA.safetensors (353.9 MB)"
+                )
+
             self.wan_i2v = wan.InfiniteTalkPipeline(
                 config=cfg,
                 checkpoint_dir=self.ckpt_dir,

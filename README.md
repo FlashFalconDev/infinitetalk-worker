@@ -1,10 +1,42 @@
-# InfiniteTalk Worker v7.2
+# InfiniteTalk Worker v8.0.0
 
-🚀 高性能的 InfiniteTalk 視頻生成 Worker，支援完整 GPU 監控和 Token 認證。
+🚀 高性能的 InfiniteTalk 視頻生成 Worker，支援完整 GPU 監控、Token 認證和 **Multi-GPU 並行處理**。
+
+---
+
+## ⚠️ 重要提醒
+
+### 📖 完整部署指南
+
+**⭐ 強烈推薦**: [DEPLOYMENT_GUIDE_COMPLETE.md](./DEPLOYMENT_GUIDE_COMPLETE.md) - **包含所有實際驗證的修復步驟**
+
+此指南記錄了從安裝到成功生成影片的完整流程，包含：
+- ✅ Python 3.12 兼容性修復
+- ✅ Flash Attention fallback 實作
+- ✅ CUDA 記憶體優化
+- ✅ 所有遇到的問題和解決方案
+- ✅ 已在實際環境測試通過
+
+**簡化版**: [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) - 基本部署流程
+
+### ⚠️ 關鍵注意事項
+
+此 Worker 需要配合 **[MeiGen-AI/InfiniteTalk](https://github.com/MeiGen-AI/InfiniteTalk)** 官方倉庫的模型使用！
+
+- ❌ **錯誤做法**: 只克隆此倉庫（會缺少 ~160GB 的模型權重）
+- ✅ **正確做法**: 按照 [DEPLOYMENT_GUIDE_COMPLETE.md](./DEPLOYMENT_GUIDE_COMPLETE.md) 的完整流程部署
+
+---
 
 ## ✨ 主要功能
 
 - 🔐 **Token 認證**: 安全的 Bearer Token 認證機制
+- 🔥 **Multi-GPU 並行處理** (v8.0.0 新功能):
+  - 支援多 GPU 並行影片生成
+  - 自動 GPU 調度和負載均衡
+  - 吞吐量可提升 2x-4x（取決於 GPU 數量）
+  - 輕鬆切換單/多 GPU 模式
+  - 詳見: [MULTI_GPU_GUIDE.md](./MULTI_GPU_GUIDE.md)
 - 📊 **GPU 監控**: 完整的 GPU 性能監控
   - 使用率、溫度、功率
   - 時鐘頻率、風扇轉速

@@ -15,6 +15,9 @@ from datetime import datetime
 from dotenv import load_dotenv
 load_dotenv()
 
+# Configure PyTorch CUDA memory allocator to reduce fragmentation
+os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
+
 from model_service import get_model_service
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
