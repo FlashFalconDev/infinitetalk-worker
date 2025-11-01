@@ -4,7 +4,23 @@
 
 ---
 
-## 🚀 快速開始
+## 🔥 RTX 5090 用戶請注意！
+
+**如果你使用 NVIDIA RTX 5090 (Blackwell 架構)**，請優先閱讀：
+
+### 👉 [RTX_5090_INSTALLATION_GUIDE.md](./RTX_5090_INSTALLATION_GUIDE.md) ⚡
+
+這份指南包含：
+- ✅ CUDA 12.8 + PyTorch 2.9.0 配置
+- ✅ Flash Attention 兼容性解決方案
+- ✅ RTX 5090 專屬優化設置
+- ✅ 已在 RTX 5090 32GB 上完整驗證
+
+**RTX 5090 與舊版 GPU 配置不同，請務必使用專用指南！**
+
+---
+
+## 🚀 快速開始 (其他 GPU)
 
 ### 推薦閱讀順序
 
@@ -44,11 +60,19 @@ cd /workspace/infinitetalk-worker
 
 ## 📋 環境要求
 
+### 一般 GPU (RTX 3090, 4090, A100 等)
 - **GPU**: NVIDIA GPU (24GB+ VRAM 推薦)
 - **磁盤**: 至少 250GB 可用空間
 - **內存**: 32GB+ RAM
 - **Python**: 3.10 - 3.12
 - **CUDA**: 12.1
+
+### RTX 5090 專用要求 🔥
+- **GPU**: NVIDIA RTX 5090 (32GB VRAM)
+- **驅動**: 581.57+
+- **CUDA**: 12.8 (透過 PyTorch 2.9.0)
+- **特殊配置**: 禁用 Flash Attention
+- **詳細說明**: 請參考 [RTX_5090_INSTALLATION_GUIDE.md](./RTX_5090_INSTALLATION_GUIDE.md)
 
 ---
 
@@ -80,7 +104,8 @@ cd /workspace/infinitetalk-worker
 
 | 文檔 | 用途 | 推薦度 |
 |------|------|--------|
-| **SMOOTH_DEPLOYMENT_GUIDE.md** | 完整安裝流程 (實戰驗證) | ⭐⭐⭐⭐⭐ |
+| **RTX_5090_INSTALLATION_GUIDE.md** 🔥 | **RTX 5090 專用安裝指南** | ⭐⭐⭐⭐⭐ |
+| **SMOOTH_DEPLOYMENT_GUIDE.md** | 完整安裝流程 (其他 GPU) | ⭐⭐⭐⭐⭐ |
 | **LORA_DOWNLOAD_GUIDE.md** | LoRA 詳細下載指南 | ⭐⭐⭐⭐ |
 | **README_OFFICIAL_DEPLOYMENT.md** | 官方部署文檔 | ⭐⭐⭐ |
 | **DEPLOYMENT_ISSUES_LOG.md** | 問題記錄和解決方案 | ⭐⭐⭐ |
